@@ -141,6 +141,7 @@ a{color:var(--pri)}
 
 <script>
 'use strict';
+const APP_VER='7';
 /* ============ LANGUAGES ============ */
 const LANGS={
   ta:{name:'Tamil',native:'தமிழ்',tts:'ta-IN',script:true},
@@ -334,11 +335,13 @@ let actx;function beep(ok){try{actx=actx||new(window.AudioContext||window.webkit
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 let micOK=false,curRec=null;
 const NO_START='The mic didn’t start. If you opened Mozhi inside another app (Claude, WhatsApp, GitHub…), open it in Chrome instead. You can also tap the 🎤 on your keyboard to dictate.';
-function srErr(c){return({'not-allowed':'Microphone is blocked. Tap the ⓘ/🔒 next to the address bar → Permissions → Microphone → Allow.','service-not-allowed':'Speech service is blocked here — open Mozhi in Chrome, or use the 🎤 on your keyboard.','network':'Voice recognition needs internet.','audio-capture':'No microphone found.','language-not-supported':'This phone can’t recognise that language yet — use the 🎤 on your keyboard instead.','no-speech':'Didn’t hear anything — try again','aborted':'Stopped'})[c]||('Mic error: '+c)}
+const MIC_PERM='Mozhi can’t get the microphone. Long-press the Mozhi icon → App info → Permissions → Microphone → Allow (or Chrome → ⋮ → Settings → Site settings → Microphone → allow firstlaboratory.github.io). Meanwhile, use the 🎤 on your keyboard.';
+function srErr(c){return({'not-allowed':MIC_PERM,'service-not-allowed':'Speech service is blocked here — open Mozhi in Chrome, or use the 🎤 on your keyboard.','network':'Voice recognition needs internet.','audio-capture':'No microphone found.','language-not-supported':'This phone can’t recognise that language yet — use the 🎤 on your keyboard instead.','no-speech':'Didn’t hear anything — try again','aborted':'Stopped'})[c]||('Mic error: '+c)}
 async function ensureMic(){if(micOK||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return;
-  try{const st=await navigator.mediaDevices.getUserMedia({audio:true});st.getTracks().forEach(t=>t.stop());micOK=true}
-  catch(e){throw new Error(e.name==='NotAllowedError'?srErr('not-allowed'):e.name==='NotFoundError'?srErr('audio-capture'):NO_START)}}
-function listen(l){return new Promise(async(res,rej)=>{
+  try{const st=await Promise.race([navigator.mediaDevices.getUserMedia({audio:true}),sleep(8000).then(()=>{throw Object.assign(new Error('timeout'),{name:'Timeout'})})]);st.getTracks().forEach(t=>t.stop());micOK=true}
+  catch(e){throw new Error(e.name==='NotAllowedError'?srErr('not-allowed'):e.name==='NotFoundError'?srErr('audio-capture'):e.name==='Timeout'?MIC_PERM:NO_START)}}
+function listen(l){return Promise.race([listenInner(l),sleep(25000).then(()=>{if(curRec){try{curRec.abort()}catch(e){}curRec=null}throw new Error(NO_START)})])}
+function listenInner(l){return new Promise(async(res,rej)=>{
   if(curRec){const c=curRec;curRec=null;try{c.abort()}catch(e){}return rej(new Error('Stopped'))}
   if(!SR)return rej(new Error('Voice input isn’t supported in this browser. Open Mozhi in Chrome, or use the 🎤 on your keyboard.'));
   try{await ensureMic()}catch(e){return rej(e)}
@@ -886,7 +889,8 @@ function openSettings(){
   <label class="f">Gemini model (optional)</label><input type="text" id="stMo" value="${esc(S.model)}" placeholder="gemini-flash-latest">
   <button class="btn pri block" style="margin-top:18px" onclick="saveSettings()">Save</button>
   <div class="mute small" style="margin-top:16px">Voices on this device — ${vs}. If a voice is missing: Android Settings → Text-to-speech → Google → Install voice data.</div>
-  <button class="btn ghost block" style="margin-top:14px;color:var(--bad)" onclick="resetAll()">Reset progress</button>`);
+  <button class="btn ghost block" style="margin-top:14px;color:var(--bad)" onclick="resetAll()">Reset progress</button>
+  <div class="mute small center" style="margin-top:14px">Mozhi version ${APP_VER}</div>`);
 }
 async function resetAll(){if(!confirm('Reset ALL progress, flashcards and history?'))return;const k=S.key,kt=S.keyT,mo=S.model,a=S.acct,gk=S.groqKey,en=S.engine;S=def();S.key=k;S.keyT=kt;S.model=mo;S.acct=a;S.groqKey=gk;S.engine=en;S.resetAt=Date.now();saveLocal();if(a&&gReady()){try{await driveWrite(syncData())}catch(e){}}location.reload()}
 function saveSettings(){const b=$('stB').value,t=$('stT').value;if(b===t)return toast('Pick two different languages');
@@ -895,7 +899,7 @@ function saveSettings(){const b=$('stB').value,t=$('stT').value;if(b===t)return 
 /* ============ BOOT ============ */
 if(S.target)render();else onboard();
 updCloud();
-if('serviceWorker' in navigator&&location.protocol==='https:'&&!location.hostname.endsWith('claude.ai')){navigator.serviceWorker.register('sw.js').catch(()=>{})}
+if('serviceWorker' in navigator&&location.protocol==='https:'&&!location.hostname.endsWith('claude.ai')){navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).catch(()=>{})}
 </script>
 </body>
 </html>
