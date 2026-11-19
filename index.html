@@ -141,7 +141,7 @@ a{color:var(--pri)}
 
 <script>
 'use strict';
-const APP_VER='7';
+const APP_VER='8';
 /* ============ LANGUAGES ============ */
 const LANGS={
   ta:{name:'Tamil',native:'தமிழ்',tts:'ta-IN',script:true},
@@ -319,7 +319,7 @@ function yesterday(){const d=new Date();d.setDate(d.getDate()-1);return dstr(d)}
 function curStreak(){return(S.last===today()||S.last===yesterday())?S.streak:0}
 function dayXp(){return S.day===today()?S.dayXp:0}
 function addXp(n){const t=today();if(S.day!==t){S.day=t;S.dayXp=0}S.dayXp+=n;S.xp+=n;if(S.last!==t){S.streak=S.last===yesterday()?S.streak+1:1;S.last=t}save();hdr()}
-let toastT;function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2600)}
+let toastT;function toast(m){if(!m)return;const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2600)}
 function norm(s){return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').normalize('NFC').replace(/[^\p{L}\p{M}\p{N}]/gu,'')}
 function sim(a,b){a=norm(a);b=norm(b);if(!a||!b)return 0;const m=a.length,n=b.length;let p=Array.from({length:n+1},(_,j)=>j);for(let i=1;i<=m;i++){const c=[i];for(let j=1;j<=n;j++)c[j]=Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1));p=c}return 1-p[n]/Math.max(m,n)}
 function allUnits(){return UNITS.concat(S.custom.units.filter(u=>u.base===S.base&&u.target===S.target))}
@@ -357,6 +357,70 @@ function listenInner(l){return new Promise(async(res,rej)=>{
   r.onend=()=>{interim?finish(null,[interim]):finish(new Error(srErr('no-speech')))};
   try{r.start()}catch(e){finish(new Error(NO_START))}
 })}
+
+/* ============ VOICE: record + AI transcription (works where Chrome speech fails) ============ */
+let REC=null;
+function pickMime(){if(!window.MediaRecorder)return'';const c=['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus'];return MediaRecorder.isTypeSupported?(c.find(m=>MediaRecorder.isTypeSupported(m))||''):''}
+async function getMic(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error(NO_START);
+  try{return await Promise.race([navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}}),new Promise((_,j)=>setTimeout(()=>j(Object.assign(new Error('t'),{name:'Timeout'})),10000))])}
+  catch(e){throw new Error(e.name==='NotAllowedError'||e.name==='Timeout'||e.name==='SecurityError'?MIC_PERM:e.name==='NotFoundError'?srErr('audio-capture'):'Mic error: '+(e.message||e.name))}
+}
+function recordAudio(btn){return new Promise(async(res,rej)=>{
+  btn.innerHTML='<span class="spin"></span>';
+  let stream;try{stream=await getMic()}catch(e){return rej(e)}
+  const mime=pickMime();let mr;
+  try{mr=mime?new MediaRecorder(stream,{mimeType:mime}):new MediaRecorder(stream)}catch(e){stream.getTracks().forEach(t=>t.stop());return rej(new Error('Recording isn’t supported here — use the 🎤 on your keyboard.'))}
+  const chunks=[],t0=Date.now();
+  const tick=()=>{if(btn.isConnected)btn.innerHTML='⏹ '+Math.round((Date.now()-t0)/1000)+'s'};
+  tick();const iv=setInterval(tick,500);const cap=setTimeout(()=>{if(mr.state!=='inactive')mr.stop()},30000);
+  mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+  mr.onstop=()=>{clearInterval(iv);clearTimeout(cap);REC=null;stream.getTracks().forEach(t=>t.stop());if(btn.isConnected)btn.innerHTML='<span class="spin"></span>';
+    const blob=new Blob(chunks,{type:(mr.mimeType||mime||'audio/webm')});
+    if(Date.now()-t0<700||blob.size<800)return rej(new Error('Too short — tap 🎤, speak, then tap ⏹'));res(blob)};
+  mr.onerror=e=>{clearInterval(iv);clearTimeout(cap);REC=null;stream.getTracks().forEach(t=>t.stop());rej(new Error('Recording failed'))};
+  REC=mr;mr.start(250);toast('🔴 Recording — speak, then tap ⏹');
+})}
+function blobB64(b){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(b)})}
+async function toWav(blob){
+  const AC=window.AudioContext||window.webkitAudioContext;const ac=new AC();let audio;
+  try{audio=await ac.decodeAudioData(await blob.arrayBuffer())}finally{try{ac.close()}catch(e){}}
+  const rate=16000,len=Math.max(1,Math.ceil(audio.duration*rate));const off=new OfflineAudioContext(1,len,rate);
+  const src=off.createBufferSource();src.buffer=audio;src.connect(off.destination);src.start();
+  const d=(await off.startRendering()).getChannelData(0);
+  const v=new DataView(new ArrayBuffer(44+d.length*2));const w=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))};
+  w(0,'RIFF');v.setUint32(4,36+d.length*2,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,rate,true);v.setUint32(28,rate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,d.length*2,true);
+  for(let i=0;i<d.length;i++){const x=Math.max(-1,Math.min(1,d[i]));v.setInt16(44+i*2,x<0?x*0x8000:x*0x7fff,true)}
+  return new Blob([v],{type:'audio/wav'});
+}
+function tfetch(url,opt,ms){const c=new AbortController();const t=setTimeout(()=>c.abort(),ms||30000);return fetch(url,Object.assign({},opt,{signal:c.signal})).finally(()=>clearTimeout(t))}
+async function transcribe(blob,l){
+  const errs=[];
+  if(S.groqKey){
+    const ext=blob.type.includes('mp4')?'m4a':blob.type.includes('ogg')?'ogg':'webm';
+    for(const m of ['whisper-large-v3-turbo','whisper-large-v3']){
+      try{const fd=new FormData();fd.append('file',blob,'voice.'+ext);fd.append('model',m);fd.append('language',l);fd.append('response_format','json');
+        const r=await tfetch('https://api.groq.com/openai/v1/audio/transcriptions',{method:'POST',headers:{Authorization:'Bearer '+S.groqKey},body:fd});
+        const j=await r.json().catch(()=>({}));
+        if(r.ok&&typeof j.text==='string')return j.text.trim();
+        errs.push('Groq: '+((j.error&&j.error.message)||r.status));if(r.status===401)break;
+      }catch(e){errs.push('Groq: could not connect');break}
+    }
+  }
+  if(S.key){
+    try{const b64=await blobB64(await toWav(blob));
+      const out=await geminiCall([{role:'user',parts:[{inlineData:{mimeType:'audio/wav',data:b64}},{text:`Transcribe exactly what is spoken in this audio. The speaker is probably using ${LANGS[l].name}, possibly mixed with English words or slang. Write ${LANGS[l].name} words in ${LANGS[l].name} script and English words in English letters. Do not translate. Return JSON: {"text":"..."}`}]}],null,0,true);
+      if(out&&out.text!=null)return String(out.text).trim();
+    }catch(e){errs.push('Gemini: '+e.message)}
+  }
+  throw new Error('Couldn’t turn your voice into text. '+errs.join(' · '));
+}
+/* one entry point for every mic button: tap to start, tap again to stop */
+async function voice(l,btn){
+  if(REC){REC.stop();throw Object.assign(new Error(''),{silent:true})}
+  if(hasAI()&&window.MediaRecorder){const blob=await recordAudio(btn);const t=await transcribe(blob,l);if(!t)throw new Error('Didn’t catch any words — try again');return[t]}
+  btn.innerHTML='<span class="spin"></span>';return listen(l);
+}
 
 /* ============ GEMINI ============ */
 let goodModel=null;
@@ -694,11 +758,11 @@ function pickTok(i){const q=Q.qs[Q.i];if(Q.answered||q.sel.includes(i))return;q.
 function unpick(k){if(Q.answered)return;Q.qs[Q.i].sel.splice(k,1);drawTokens()}
 function checkArrange(){const q=Q.qs[Q.i];const got=q.sel.map(i=>q.toks[i].s).join(' ');feedback(norm(got)===norm(q.target.join(' ')))}
 async function speakTry(){
-  if(Q.answered)return;const q=Q.qs[Q.i],b=$('micBtn');b.innerHTML='<span class="spin"></span>';$('heard').textContent='Listening…';
-  try{const alts=await listen(S.target);let best=0,bt=alts[0]||'';alts.forEach(a=>{const s=Math.max(sim(a,q.target.s),q.target.r?sim(a,q.target.r):0);if(s>best){best=s;bt=a}});
+  if(Q.answered)return;const q=Q.qs[Q.i],b=$('micBtn');if(!REC)$('heard').textContent=hasAI()?'Speak, then tap ⏹':'Listening…';
+  try{const alts=await voice(S.target,b);let best=0,bt=alts[0]||'';alts.forEach(a=>{const s=Math.max(sim(a,q.target.s),q.target.r?sim(a,q.target.r):0);if(s>best){best=s;bt=a}});
     $('heard').innerHTML='You said: <b>'+esc(bt)+'</b>';b.textContent='🎤';
     if(best>=.6)feedback(true);else{toast(best>=.35?'Close! Try once more':'Not quite — listen and try again');}
-  }catch(e){b.textContent='🎤';$('heard').textContent=e.message}
+  }catch(e){if(e.silent){$('heard').textContent='Checking…';return}b.textContent='🎤';$('heard').textContent=e.message}
 }
 function skipSpeak(){Q.qs.splice(Q.i,1);Q.total--;renderQ()}
 function feedback(ok){
@@ -785,10 +849,10 @@ function vScene(v){
   <button class="btn pri block" onclick="playAll()">▶ Play whole conversation</button>`;
 }
 function playAll(){const sc=SCENES.find(s=>s.id===scene);let i=0;const L=S.target;speechSynthesis.cancel();const next=()=>{if(i>=sc.items.length)return;const u=new SpeechSynthesisUtterance(tx(sc.items[i],L).s);u.lang=LANGS[L].tts;const v=voiceFor(L);if(v)u.voice=v;u.rate=.9;u.onend=()=>{i++;setTimeout(next,400)};speechSynthesis.speak(u)};next()}
-async function sceneMic(i){const sc=SCENES.find(s=>s.id===scene),t=tx(sc.items[i],S.target),b=$('sm'+i);b.innerHTML='<span class="spin"></span>';
-  try{const alts=await listen(S.target);const best=Math.max(...alts.map(a=>Math.max(sim(a,t.s),t.r?sim(a,t.r):0)));
+async function sceneMic(i){const sc=SCENES.find(s=>s.id===scene),t=tx(sc.items[i],S.target),b=$('sm'+i);
+  try{const alts=await voice(S.target,b);const best=Math.max(...alts.map(a=>Math.max(sim(a,t.s),t.r?sim(a,t.r):0)));
     if(best>=.6){beep(true);reveal[i]=1;addXp(5);toast('Great! +5 XP');render()}else{beep(false);b.textContent='🎤 Try again';toast('Heard: '+alts[0])}}
-  catch(e){b.textContent='🎤 Say it';toast(e.message)}}
+  catch(e){if(e.silent)return;b.textContent='🎤 Say it';toast(e.message)}}
 
 function rpSys(){const T=LANGS[S.target].name,B=LANGS[S.base].name;return`You are role-playing a real person in this situation: "${RP.sit}". Speak ONLY natural, everyday spoken ${T} — the way locals actually talk, short (1–2 sentences), simple words suitable for a learner.
 The learner's own language is ${B}. They are practising ${T}; they may reply in ${T}, in ${B}, in slang, romanized or mixed.
@@ -809,7 +873,7 @@ function vRoleplay(v){const L=S.target;
   <div class="card"><textarea id="rpIn" style="min-height:64px" placeholder="Reply in ${esc(LANGS[L].name)}, ${esc(LANGS[S.base].name)} or slang…"></textarea>
   <div class="row" style="margin-top:8px"><button class="btn" id="rpMic" onclick="rpMic()">🎤 ${esc(LANGS[L].name)}</button><button class="btn pri grow" onclick="rpSend()" ${RP.busy?'disabled':''}>Send</button></div></div>`}
 function rpSend(){const t=($('rpIn').value||'').trim();if(!t||RP.busy)return;rpCall(t)}
-async function rpMic(){const b=$('rpMic');b.innerHTML='<span class="spin"></span>';try{const a=await listen(S.target);$('rpIn').value=a[0]}catch(e){toast(e.message)}b.textContent='🎤 '+LANGS[S.target].name}
+async function rpMic(){const b=$('rpMic');try{const a=await voice(S.target,b);const el=$('rpIn');if(el)el.value=a[0]}catch(e){if(e.silent)return;toast(e.message)}const nb=$('rpMic');if(nb)nb.textContent='🎤 '+LANGS[S.target].name}
 
 /* ============ TRANSLATE ============ */
 let TR=null;
@@ -835,7 +899,7 @@ function trCard(r,to){return`<div class="card tr-out"><div class="small mute">${
   ${r.polite&&r.polite!==r.translation?`<div class="small" style="margin-top:8px"><b>More polite:</b> ${esc(r.polite)} ${r.polite_romanized?`<span class="rom">(${esc(r.polite_romanized)})</span>`:''} <button class="chip" onclick="say(${jsq(r.polite)},'${to}')">🔊</button></div>`:''}
   ${r.notes?`<div class="fb">💬 ${esc(r.notes)}</div>`:''}</div>`}
 function copyTxt(t){(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Copied'),()=>toast('Could not copy'))}
-async function trMic(){const b=$('trMic'),l=$('trMicL').value;b.innerHTML='<span class="spin"></span>';try{const a=await listen(l);const el=$('trIn');el.value=(el.value?el.value+' ':'')+a[0]}catch(e){toast(e.message)}b.textContent='🎤 Speak'}
+async function trMic(){const b=$('trMic'),l=$('trMicL').value;try{const a=await voice(l,b);const el=$('trIn');if(el)el.value=(el.value?el.value+' ':'')+a[0]}catch(e){if(e.silent)return;toast(e.message)}const nb=$('trMic');if(nb)nb.textContent='🎤 Speak'}
 async function doTranslate(){
   const text=($('trIn').value||'').trim();if(!text)return toast('Type or speak something first');
   if(!hasAI()){openSettings();return toast('Add an AI key first')}
