@@ -332,7 +332,28 @@ function voiceFor(l){const code=LANGS[l].tts.toLowerCase();return voices.find(v=
 function say(text,l,rate){if(!('speechSynthesis' in window)){toast('Speech is not supported here');return}speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang=LANGS[l].tts;const v=voiceFor(l);if(v)u.voice=v;u.rate=rate||.9;speechSynthesis.speak(u)}
 let actx;function beep(ok){try{actx=actx||new(window.AudioContext||window.webkitAudioContext)();const o=actx.createOscillator(),g=actx.createGain();o.connect(g);g.connect(actx.destination);const t=actx.currentTime;o.frequency.setValueAtTime(ok?660:220,t);if(ok)o.frequency.setValueAtTime(880,t+.09);g.gain.setValueAtTime(.08,t);g.gain.exponentialRampToValueAtTime(.001,t+.25);o.start(t);o.stop(t+.26)}catch(e){}}
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-function listen(l){return new Promise((res,rej)=>{if(!SR)return rej(new Error('Speech recognition is not supported in this browser (use Chrome on Android).'));const r=new SR();r.lang=LANGS[l].tts;r.interimResults=false;r.maxAlternatives=5;let got=false;r.onresult=e=>{got=true;res(Array.from(e.results[0]).map(a=>a.transcript))};r.onerror=e=>{if(!got)rej(new Error(e.error==='no-speech'?'Didn’t hear anything — try again':e.error==='not-allowed'?'Microphone permission denied':e.error))};r.onend=()=>{if(!got)rej(new Error('Didn’t hear anything — try again'))};try{r.start()}catch(e){rej(e)}})}
+let micOK=false,curRec=null;
+const NO_START='The mic didn’t start. If you opened Mozhi inside another app (Claude, WhatsApp, GitHub…), open it in Chrome instead. You can also tap the 🎤 on your keyboard to dictate.';
+function srErr(c){return({'not-allowed':'Microphone is blocked. Tap the ⓘ/🔒 next to the address bar → Permissions → Microphone → Allow.','service-not-allowed':'Speech service is blocked here — open Mozhi in Chrome, or use the 🎤 on your keyboard.','network':'Voice recognition needs internet.','audio-capture':'No microphone found.','language-not-supported':'This phone can’t recognise that language yet — use the 🎤 on your keyboard instead.','no-speech':'Didn’t hear anything — try again','aborted':'Stopped'})[c]||('Mic error: '+c)}
+async function ensureMic(){if(micOK||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return;
+  try{const st=await navigator.mediaDevices.getUserMedia({audio:true});st.getTracks().forEach(t=>t.stop());micOK=true}
+  catch(e){throw new Error(e.name==='NotAllowedError'?srErr('not-allowed'):e.name==='NotFoundError'?srErr('audio-capture'):NO_START)}}
+function listen(l){return new Promise(async(res,rej)=>{
+  if(curRec){const c=curRec;curRec=null;try{c.abort()}catch(e){}return rej(new Error('Stopped'))}
+  if(!SR)return rej(new Error('Voice input isn’t supported in this browser. Open Mozhi in Chrome, or use the 🎤 on your keyboard.'));
+  try{await ensureMic()}catch(e){return rej(e)}
+  const r=new SR();curRec=r;r.lang=LANGS[l].tts;r.interimResults=true;r.maxAlternatives=5;r.continuous=false;
+  let done=false,started=false,interim='';
+  const finish=(err,val)=>{if(done)return;done=true;clearTimeout(t1);clearTimeout(t2);if(curRec===r)curRec=null;try{r.abort()}catch(e){}err?rej(err):res(val)};
+  const t1=setTimeout(()=>{if(!started)finish(new Error(NO_START))},6000);
+  const t2=setTimeout(()=>{interim?finish(null,[interim]):finish(new Error(srErr('no-speech')))},15000);
+  r.onstart=()=>{started=true;toast('🎤 Listening in '+LANGS[l].name+'… speak now')};
+  r.onaudiostart=()=>{started=true};
+  r.onresult=e=>{let t='';for(let i=e.resultIndex;i<e.results.length;i++){const R=e.results[i];if(R.isFinal)return finish(null,Array.from(R).map(a=>a.transcript));t+=R[0].transcript}interim=t;if(t)toast('🎤 '+t)};
+  r.onerror=e=>finish(new Error(srErr(e.error)));
+  r.onend=()=>{interim?finish(null,[interim]):finish(new Error(srErr('no-speech')))};
+  try{r.start()}catch(e){finish(new Error(NO_START))}
+})}
 
 /* ============ GEMINI ============ */
 async function gemini(contents,sys,temp){
@@ -755,6 +776,7 @@ function vTranslate(v){
    <textarea id="trIn" style="margin-top:10px" placeholder="e.g. Machi, semma traffic da, late aagum">${esc(TR&&TR.text||'')}</textarea>
    <div class="row" style="margin-top:10px"><button class="btn" id="trMic" onclick="trMic()">🎤 Speak</button><select id="trMicL" style="width:auto;flex:1" onchange="S.trMic=this.value;save()">${ORDER.map(l=>`<option value="${l}" ${ml===l?'selected':''}>in ${LANGS[l].name}</option>`).join('')}</select></div>
    <button class="btn pri block" id="trGo" style="margin-top:10px" onclick="doTranslate()">Translate</button>
+   <div class="mute small" style="margin-top:8px">Tip: you can also tap the 🎤 on your phone’s keyboard to dictate in any language.</div>
   </div>
   <div id="trOut">${TR&&TR.res?trCard(TR.res,TR.to):''}</div>
   ${S.hist.length?`<h2>Recent</h2>${S.hist.slice(0,15).map((h,i)=>`<div class="hist" onclick="TR={text:S.hist[${i}].text,res:S.hist[${i}].res,to:S.hist[${i}].to};render()"><div class="small mute">${esc(h.text)}</div><div><b>${esc(h.res.translation)}</b> <span class="rom small">${esc(h.res.romanized||'')}</span></div></div>`).join('')}<button class="btn ghost" style="margin-top:10px" onclick="if(confirm('Clear history?')){S.hist=[];save();render()}">Clear history</button>`:''}`;
