@@ -116,12 +116,15 @@ label.f{display:block;font-weight:700;font-size:14px;margin:14px 0 6px}
 .spin{display:inline-block;width:18px;height:18px;border:3px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .8s linear infinite;vertical-align:middle}
 @keyframes sp{to{transform:rotate(360deg)}}
 a{color:var(--pri)}
+.cloud{position:relative}.cloud::after{content:'';position:absolute;right:2px;top:2px;width:9px;height:9px;border-radius:50%;background:transparent}
+.cloud.on::after{background:var(--ok)}.cloud.pend::after{background:var(--acc)}
 </style>
 </head>
 <body>
 <header>
   <div class="logo">Mozhi<small id="course"></small></div>
   <span class="chip" id="streakChip" title="Day streak">🔥 0</span>
+  <button class="iconbtn cloud" id="cloudBtn" onclick="cloudTap()" aria-label="Google sync">☁️</button>
   <button class="iconbtn" onclick="openSettings()" aria-label="Settings">⚙️</button>
 </header>
 <main id="view"></main>
@@ -297,7 +300,8 @@ const KEY='mozhi.v1';
 function def(){return{base:'en',target:null,xp:0,streak:0,last:null,day:null,dayXp:0,goal:50,done:{},srs:{},custom:{items:{},units:[]},key:'',model:'',hist:[],trTo:null,mic:true}}
 function load(){try{const j=JSON.parse(localStorage.getItem(KEY)||'null');if(j)return Object.assign(def(),j)}catch(e){}return def()}
 let S=load();
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function saveLocal(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(){saveLocal();schedulePush()}
 
 /* ============ HELPERS ============ */
 const $=id=>document.getElementById(id);
@@ -352,9 +356,91 @@ async function gemini(contents,sys,temp){
   throw last;
 }
 
+/* ============ GOOGLE SIGN-IN + DRIVE SYNC ============ */
+/* Data lives in a hidden app folder in the user's own Google Drive (drive.appdata). No server. */
+const GOOGLE_CLIENT_ID=''; // OAuth 2.0 Web client ID from Google Cloud (not a secret)
+const DRIVE_SCOPE='https://www.googleapis.com/auth/drive.appdata';
+const DFILE='mozhi.json';
+const G={token:null,exp:0,busy:false,dirty:false,timer:null};
+function gReady(){return !!G.token&&Date.now()<G.exp-60000}
+function loadGis(){return new Promise((res,rej)=>{if(window.google&&google.accounts&&google.accounts.oauth2)return res();const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.async=true;s.onload=()=>res();s.onerror=()=>rej(new Error('Could not reach Google — check your internet'));document.head.appendChild(s)})}
+async function gToken(){
+  if(gReady())return G.token;
+  if(!GOOGLE_CLIENT_ID)throw new Error('Google sign-in isn’t set up yet (Client ID missing).');
+  await loadGis();
+  return new Promise((res,rej)=>{
+    const cfg={client_id:GOOGLE_CLIENT_ID,scope:DRIVE_SCOPE+' openid email profile',
+      callback:r=>{if(r.error)return rej(new Error(r.error_description||r.error));
+        if(google.accounts.oauth2.hasGrantedAllScopes&&!google.accounts.oauth2.hasGrantedAllScopes(r,DRIVE_SCOPE))return rej(new Error('Please allow Mozhi to save its data in your Google Drive'));
+        G.token=r.access_token;G.exp=Date.now()+(+r.expires_in||3600)*1000;res(G.token)},
+      error_callback:e=>rej(new Error(e&&e.type==='popup_closed'?'Sign-in cancelled':(e&&e.message)||'Sign-in failed'))};
+    if(S.acct&&S.acct.email)cfg.login_hint=S.acct.email;
+    google.accounts.oauth2.initTokenClient(cfg).requestAccessToken({prompt:S.acct?'':'consent'});
+  });
+}
+async function gfetch(url,opt){opt=opt||{};const t=await gToken();opt.headers=Object.assign({Authorization:'Bearer '+t},opt.headers||{});
+  let r;try{r=await fetch(url,opt)}catch(e){throw new Error('No internet — sync will happen later')}
+  if(r.status===401){G.token=null;throw new Error('Google session expired — tap ☁️ to sync')}
+  if(!r.ok){const j=await r.json().catch(()=>({}));const er=new Error((j.error&&j.error.message)||('Drive error '+r.status));er.status=r.status;throw er}
+  return r}
+async function driveFind(){const r=await gfetch("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id,modifiedTime)&q="+encodeURIComponent("name='"+DFILE+"'"));const j=await r.json();return (j.files||[])[0]}
+async function driveRead(id){return (await gfetch('https://www.googleapis.com/drive/v3/files/'+id+'?alt=media')).json()}
+async function driveWrite(data){
+  const body=JSON.stringify(data);
+  if(S.acct.fileId){try{await gfetch('https://www.googleapis.com/upload/drive/v3/files/'+S.acct.fileId+'?uploadType=media',{method:'PATCH',headers:{'Content-Type':'application/json'},body});return}catch(e){if(e.status!==404)throw e;S.acct.fileId=null}}
+  const b='mozhi'+Date.now();
+  const multi='--'+b+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify({name:DFILE,parents:['appDataFolder']})+'\r\n--'+b+'\r\nContent-Type: application/json\r\n\r\n'+body+'\r\n--'+b+'--';
+  const j=await (await gfetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+b},body:multi})).json();
+  S.acct.fileId=j.id;saveLocal();
+}
+function syncData(){const d=JSON.parse(JSON.stringify(S));delete d.acct;d._t=Date.now();return d}
+function dnum(s){if(!s)return 0;const p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2]).getTime()}
+function mergeState(r){
+  if(!r||typeof r!=='object')return;
+  if((r.keyT||0)>(S.keyT||0)||(!S.key&&r.key)){S.key=r.key||'';S.keyT=r.keyT||0;S.model=r.model||''}
+  if((r._t||0)<(S.resetAt||0))return; // remote is older than a reset on this device
+  if(!S.target&&r.target){S.base=r.base;S.target=r.target}
+  S.xp=Math.max(S.xp||0,r.xp||0);
+  if(r.day===S.day)S.dayXp=Math.max(S.dayXp||0,r.dayXp||0);else if(dnum(r.day)>dnum(S.day)){S.day=r.day;S.dayXp=r.dayXp||0}
+  if(dnum(r.last)>dnum(S.last)){S.last=r.last;S.streak=r.streak||0}else if(r.last===S.last)S.streak=Math.max(S.streak||0,r.streak||0);
+  Object.keys(r.done||{}).forEach(l=>{S.done[l]=Object.assign({},r.done[l],S.done[l]||{})});
+  Object.keys(r.srs||{}).forEach(l=>{const m=S.srs[l]||(S.srs[l]={});Object.keys(r.srs[l]).forEach(id=>{const a=m[id],b=r.srs[l][id];if(!a||(b&&b.due>a.due))m[id]=b})});
+  const rc=r.custom||{};Object.assign(S.custom.items,rc.items||{},S.custom.items);
+  (rc.units||[]).forEach(u=>{if(!S.custom.units.some(x=>x.id===u.id))S.custom.units.push(u)});
+  const seen=new Set(),h=[];(S.hist||[]).concat(r.hist||[]).forEach(x=>{const k=x.text+'|'+x.to;if(!seen.has(k)){seen.add(k);h.push(x)}});S.hist=h.slice(0,30);
+}
+function schedulePush(){if(!S.acct)return;G.dirty=true;clearTimeout(G.timer);if(gReady())G.timer=setTimeout(pushNow,2500);updCloud()}
+async function pushNow(){if(!S.acct||!gReady()||G.busy)return;G.busy=true;updCloud();
+  try{await driveWrite(syncData());G.dirty=false;S.acct.at=Date.now();saveLocal()}catch(e){console.warn('sync',e)}
+  G.busy=false;updCloud()}
+async function syncNow(){
+  if(G.busy)return;G.busy=true;updCloud();
+  try{
+    await gToken();
+    if(!S.acct||!S.acct.email){const u=await (await gfetch('https://www.googleapis.com/oauth2/v3/userinfo')).json();S.acct=Object.assign(S.acct||{},{email:u.email,name:u.name})}
+    const f=await driveFind();
+    if(f){S.acct.fileId=f.id;mergeState(await driveRead(f.id))}
+    await driveWrite(syncData());G.dirty=false;S.acct.at=Date.now();saveLocal();
+    toast(f?'Synced with Google Drive ✓':'Signed in — your data is now backed up ✓');
+  }catch(e){toast(e.message)}
+  G.busy=false;updCloud();
+  if(!$('modal').hidden){if($('obBox')){if(S.target)closeModal();else onboard()}else openSettings()}else render();
+}
+function signOut(){if(!confirm('Sign out? Your data stays on this phone and in your Drive.'))return;try{if(G.token&&window.google)google.accounts.oauth2.revoke(G.token,()=>{})}catch(e){}G.token=null;S.acct=null;saveLocal();updCloud();openSettings()}
+function updCloud(){const b=$('cloudBtn');if(!b)return;b.classList.remove('on','pend');
+  if(G.busy){b.innerHTML='<span class="spin" style="width:15px;height:15px;border-width:2px"></span>';return}
+  b.textContent='☁️';if(!S.acct){b.title='Sign in with Google to sync';return}
+  b.classList.add(G.dirty?'pend':'on');b.title=G.dirty?'Changes not synced — tap to sync':'Synced'}
+function cloudTap(){if(!S.acct)openSettings();else syncNow()}
+function ago(t){if(!t)return'never';const m=Math.round((Date.now()-t)/6e4);return m<1?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+' h ago':Math.round(m/1440)+' days ago'}
+function acctHtml(){
+  if(!GOOGLE_CLIENT_ID)return`<div class="mute small">Google sign-in needs a one-time setup (Client ID) by the app owner.</div>`;
+  if(!S.acct)return`<button class="btn pri block" onclick="syncNow()"><b style="font-size:18px">G</b> Sign in with Google</button><div class="mute small" style="margin-top:8px">Your Gemini key, progress and flashcards are saved in a hidden Mozhi folder in <b>your own</b> Google Drive, so every device you sign in on gets them. Nothing is stored on any server.</div>`;
+  return`<div>Signed in as <b>${esc(S.acct.email||'')}</b></div><div class="mute small">Last synced ${ago(S.acct.at)}${G.dirty?' · changes waiting':''}</div><div class="row" style="margin-top:10px"><button class="btn pri grow" onclick="syncNow()">Sync now</button><button class="btn ghost" onclick="signOut()">Sign out</button></div>`}
+
 /* ============ SHELL ============ */
 let tab='home';
-function hdr(){$('streakChip').textContent='🔥 '+curStreak();$('course').textContent=S.target?LANGS[S.base].name+' → '+LANGS[S.target].name:''}
+function hdr(){updCloud();$('streakChip').textContent='🔥 '+curStreak();$('course').textContent=S.target?LANGS[S.base].name+' → '+LANGS[S.target].name:''}
 document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;sub=null;render();window.scrollTo(0,0)});
 let sub=null;
 function render(){hdr();document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===tab));const v=$('view');({home:vHome,learn:vLearn,review:vReview,talk:vTalk,translate:vTranslate})[tab](v)}
@@ -710,13 +796,15 @@ function onboard(){
   openModal(`<div style="font-size:30px;font-weight:800;color:var(--pri)">Mozhi</div><div class="mute">Learn to speak, read and understand — and translate anything.</div>
   <label class="f">I speak</label><div class="langs">${ORDER.map(l=>lb(l,ob.base,null,'obB')).join('')}</div>
   <label class="f">I want to learn</label><div class="langs">${ORDER.map(l=>lb(l,ob.target,ob.base,'obT')).join('')}</div>
-  <button class="btn pri block" style="margin-top:18px" ${ob.target?'':'disabled'} onclick="S.base=ob.base;S.target=ob.target;save();closeModal()">Start learning</button>`);
+  <button class="btn pri block" style="margin-top:18px" ${ob.target?'':'disabled'} onclick="S.base=ob.base;S.target=ob.target;save();closeModal()">Start learning</button>
+  <div id="obBox">${GOOGLE_CLIENT_ID?`<div class="mute center small" style="margin:16px 0 8px">Already use Mozhi on another device?</div><button class="btn ghost block" onclick="syncNow()"><b>G</b> Sign in with Google to restore</button>`:''}</div>`);
 }
 function obB(l){ob.base=l;if(ob.target===l)ob.target=null;onboard()}
 function obT(l){ob.target=l;onboard()}
 function openSettings(){
   const vs=ORDER.map(l=>`${LANGS[l].name}: ${voices.length?(voiceFor(l)?'✅':'⚠️ no voice'):'…'}`).join(' · ');
   openModal(`<div class="row"><h2 class="grow" style="margin:0">Settings</h2><button class="iconbtn" onclick="closeModal()">✕</button></div>
+  <label class="f">Google account — sync key &amp; progress</label><div class="card" id="acctBox" style="margin:0">${acctHtml()}</div>
   <label class="f">I speak (lessons explained in)</label><select id="stB">${langOpts(S.base)}</select>
   <label class="f">I’m learning</label><select id="stT">${langOpts(S.target)}</select>
   <div class="mute small" style="margin-top:6px">Progress is kept separately for each language.</div>
@@ -724,17 +812,19 @@ function openSettings(){
   <label class="f">Speaking exercises</label><select id="stM"><option value="1" ${S.mic?'selected':''}>On — use the microphone</option><option value="0" ${!S.mic?'selected':''}>Off</option></select>
   <label class="f">Gemini API key (for translator, AI lessons, role-play)</label>
   <input type="password" id="stK" value="${esc(S.key)}" placeholder="Paste key starting with AIza…" autocomplete="off">
-  <div class="mute small" style="margin-top:6px">Free: open <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> → “Create API key” → copy → paste here. It’s stored only on this phone.</div>
+  <div class="mute small" style="margin-top:6px">Paste it once — sign in with Google above and your other devices get it automatically. Free key: open <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> → “Create API key” → copy → paste here. It’s stored on this phone and, if you sign in, in your own Google Drive.</div>
   <label class="f">Model (optional)</label><input type="text" id="stMo" value="${esc(S.model)}" placeholder="gemini-flash-latest">
   <button class="btn pri block" style="margin-top:18px" onclick="saveSettings()">Save</button>
   <div class="mute small" style="margin-top:16px">Voices on this device — ${vs}. If a voice is missing: Android Settings → Text-to-speech → Google → Install voice data.</div>
-  <button class="btn ghost block" style="margin-top:14px;color:var(--bad)" onclick="if(confirm('Reset ALL progress, flashcards and history?')){const k=S.key;S=def();S.key=k;save();location.reload()}">Reset progress</button>`);
+  <button class="btn ghost block" style="margin-top:14px;color:var(--bad)" onclick="resetAll()">Reset progress</button>`);
 }
+async function resetAll(){if(!confirm('Reset ALL progress, flashcards and history?'))return;const k=S.key,kt=S.keyT,mo=S.model,a=S.acct;S=def();S.key=k;S.keyT=kt;S.model=mo;S.acct=a;S.resetAt=Date.now();saveLocal();if(a&&gReady()){try{await driveWrite(syncData())}catch(e){}}location.reload()}
 function saveSettings(){const b=$('stB').value,t=$('stT').value;if(b===t)return toast('Pick two different languages');
-  S.base=b;S.target=t;S.goal=+$('stG').value;S.mic=$('stM').value==='1';S.key=$('stK').value.trim();S.model=$('stMo').value.trim();save();toast('Saved');closeModal()}
+  S.base=b;S.target=t;S.goal=+$('stG').value;S.mic=$('stM').value==='1';const nk=$('stK').value.trim(),nm=$('stMo').value.trim();if(nk!==S.key||nm!==S.model){S.key=nk;S.model=nm;S.keyT=Date.now()}save();if(S.acct&&!gReady()&&G.dirty)setTimeout(()=>toast('Tap ☁️ to sync this to your other devices'),2700);toast('Saved');closeModal()}
 
 /* ============ BOOT ============ */
 if(S.target)render();else onboard();
+updCloud();
 if('serviceWorker' in navigator&&location.protocol==='https:'&&!location.hostname.endsWith('claude.ai')){navigator.serviceWorker.register('sw.js').catch(()=>{})}
 </script>
 </body>
