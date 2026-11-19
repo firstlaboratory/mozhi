@@ -358,9 +358,8 @@ function listen(l){return new Promise(async(res,rej)=>{
 /* ============ GEMINI ============ */
 let goodModel=null;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-async function gemini(contents,sys,temp){
-  if(!S.key)throw new Error('Add your free Gemini API key in Settings ⚙️ first.');
-  const models=[goodModel,S.model,'gemini-flash-latest','gemini-2.5-flash','gemini-flash-lite-latest','gemini-2.5-flash-lite','gemini-2.0-flash'].filter((v,i,a)=>v&&a.indexOf(v)===i);
+async function geminiCall(contents,sys,temp,fast){
+  const models=[goodModel,S.model,'gemini-flash-latest','gemini-2.5-flash','gemini-flash-lite-latest','gemini-2.5-flash-lite','gemini-2.0-flash'].filter((v,i,a)=>v&&a.indexOf(v)===i).slice(0,fast?2:9);
   let last=new Error('No model available');
   for(const m of models){
     const body={contents,generationConfig:{temperature:temp==null?.4:temp,responseMimeType:'application/json'}};
@@ -374,7 +373,7 @@ async function gemini(contents,sys,temp){
       if(res.status===400&&/api key/i.test(msg))throw new Error('Your Gemini key isn’t valid — check it in Settings ⚙️');
       if(res.status===403)throw new Error('Gemini refused the key: '+msg);
       if(res.status===404||res.status===400){last=new Error(msg);break}            // model missing → next model
-      if(res.status===429||res.status>=500){last=new Error(msg);if(attempt===0&&res.status!==429){await sleep(1200);continue}break} // busy → retry once, then next model
+      if(res.status===429||res.status>=500){last=new Error(msg);if(!fast&&attempt===0&&res.status!==429){await sleep(1200);continue}break} // busy → retry once, then next model
       if(!res.ok)throw new Error(msg);
       const parts=(((j.candidates||[])[0]||{}).content||{}).parts||[];
       const t=parts.filter(p=>!p.thought).map(p=>p.text||'').join('');
@@ -383,8 +382,43 @@ async function gemini(contents,sys,temp){
       goodModel=m;return out;
     }
   }
-  if(/high demand|overloaded|unavailable|quota|exhausted|rate/i.test(last.message))throw new Error('Gemini is busy right now (all models). Wait a minute and try again.');
+  const e=new Error(last.message);e.busy=/high demand|overloaded|unavailable|quota|exhausted|rate|limit/i.test(last.message);throw e;
+}
+/* ---- Groq (free, fast) ---- */
+let goodGroq=null;
+async function groqCall(contents,sys,temp){
+  const msgs=[{role:'system',content:(sys?sys+'\n\n':'')+'Always answer with one valid JSON object only.'}];
+  contents.forEach(c=>msgs.push({role:c.role==='model'?'assistant':'user',content:c.parts.map(p=>p.text||'').join('')}));
+  const models=[goodGroq,'openai/gpt-oss-120b','llama-3.3-70b-versatile','moonshotai/kimi-k2-instruct-0905','meta-llama/llama-4-maverick-17b-128e-instruct','openai/gpt-oss-20b'].filter((v,i,a)=>v&&a.indexOf(v)===i);
+  let last=new Error('No Groq model available');
+  for(const m of models){
+    let res;
+    try{res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+S.groqKey},body:JSON.stringify({model:m,messages:msgs,temperature:temp==null?.4:temp,response_format:{type:'json_object'}})})}
+    catch(e){const er=new Error(navigator.onLine===false?'No internet connection.':'Could not reach Groq.');er.net=true;throw er}
+    const j=await res.json().catch(()=>({}));
+    const msg=(j.error&&j.error.message)||('Groq error '+res.status);
+    if(res.status===401)throw new Error('Your Groq key isn’t valid — check it in Settings ⚙️');
+    if(!res.ok){last=new Error(msg);last.busy=res.status===429||res.status>=500;continue}
+    const t=(((j.choices||[])[0]||{}).message||{}).content||'';
+    try{const out=JSON.parse(t);goodGroq=m;return out}catch(e){const mm=t.match(/[\[{][\s\S]*[\]}]/);if(mm){try{const out=JSON.parse(mm[0]);goodGroq=m;return out}catch(e2){}}last=new Error('Could not read the AI reply')}
+  }
   throw last;
+}
+/* ---- dispatcher: Gemini ⇄ Groq with automatic fallback ---- */
+let geminiCool=0;
+function hasAI(){return !!(S.key||S.groqKey)}
+async function gemini(contents,sys,temp){
+  if(!hasAI())throw new Error('Add a free Gemini or Groq key in Settings ⚙️ first.');
+  let order=S.engine==='groq'?['groq','gemini']:['gemini','groq'];
+  if(Date.now()<geminiCool)order=['groq','gemini'];
+  order=order.filter(x=>x==='gemini'?S.key:S.groqKey);
+  const errs=[];
+  for(const p of order){
+    try{return p==='gemini'?await geminiCall(contents,sys,temp,order.length>1):await groqCall(contents,sys,temp)}
+    catch(e){if(p==='gemini'&&e.busy)geminiCool=Date.now()+5*60e3;errs.push((p==='gemini'?'Gemini: ':'Groq: ')+e.message)}
+  }
+  if(!S.groqKey)throw new Error('Gemini is busy. Add a free Groq key in Settings ⚙️ as a backup so this doesn’t happen.');
+  throw new Error(errs.join(' · '));
 }
 
 /* ============ GOOGLE SIGN-IN + DRIVE SYNC ============ */
@@ -428,7 +462,7 @@ function syncData(){const d=JSON.parse(JSON.stringify(S));delete d.acct;d._t=Dat
 function dnum(s){if(!s)return 0;const p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2]).getTime()}
 function mergeState(r){
   if(!r||typeof r!=='object')return;
-  if((r.keyT||0)>(S.keyT||0)||(!S.key&&r.key)){S.key=r.key||'';S.keyT=r.keyT||0;S.model=r.model||''}
+  if((r.keyT||0)>(S.keyT||0)||(!S.key&&r.key)){S.key=r.key||'';S.keyT=r.keyT||0;S.model=r.model||'';S.groqKey=r.groqKey||S.groqKey||'';S.engine=r.engine||S.engine}
   if((r._t||0)<(S.resetAt||0))return; // remote is older than a reset on this device
   if(!S.target&&r.target){S.base=r.base;S.target=r.target}
   S.xp=Math.max(S.xp||0,r.xp||0);
@@ -466,7 +500,7 @@ function cloudTap(){if(!S.acct)openSettings();else syncNow()}
 function ago(t){if(!t)return'never';const m=Math.round((Date.now()-t)/6e4);return m<1?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+' h ago':Math.round(m/1440)+' days ago'}
 function acctHtml(){
   if(!GOOGLE_CLIENT_ID)return`<div class="mute small">Google sign-in needs a one-time setup (Client ID) by the app owner.</div>`;
-  if(!S.acct)return`<button class="btn pri block" onclick="syncNow()"><b style="font-size:18px">G</b> Sign in with Google</button><div class="mute small" style="margin-top:8px">Your Gemini key, progress and flashcards are saved in a hidden Mozhi folder in <b>your own</b> Google Drive, so every device you sign in on gets them. Nothing is stored on any server.</div>`;
+  if(!S.acct)return`<button class="btn pri block" onclick="syncNow()"><b style="font-size:18px">G</b> Sign in with Google</button><div class="mute small" style="margin-top:8px">Your AI keys, progress and flashcards are saved in a hidden Mozhi folder in <b>your own</b> Google Drive, so every device you sign in on gets them. Nothing is stored on any server.</div>`;
   return`<div>Signed in as <b>${esc(S.acct.email||'')}</b></div><div class="mute small">Last synced ${ago(S.acct.at)}${G.dirty?' · changes waiting':''}</div><div class="row" style="margin-top:10px"><button class="btn pri grow" onclick="syncNow()">Sync now</button><button class="btn ghost" onclick="signOut()">Sign out</button></div>`}
 
 /* ============ SHELL ============ */
@@ -757,7 +791,7 @@ function rpSys(){const T=LANGS[S.target].name,B=LANGS[S.base].name;return`You ar
 The learner's own language is ${B}. They are practising ${T}; they may reply in ${T}, in ${B}, in slang, romanized or mixed.
 Always reply with JSON only:
 {"reply":"your next line in ${T}, native script","romanized":"your line in simple English letters (empty string if ${T} uses Latin letters)","meaning":"your line translated into ${B}","feedback":"if the learner wrote in ${T}: a short friendly correction showing the more natural way (or 'Perfect!'), written in ${B}. If they wrote in another language: show how to say their message in ${T} (native script + English letters). Empty for your first line.","suggest":"one thing the learner could say next, in ${T} with English letters in brackets"}`}
-async function startRP(){const sit=($('rpSit').value||'').trim();if(!sit)return toast('Describe a situation first');if(!S.key){openSettings();return toast('Add your Gemini key to use role-play')}
+async function startRP(){const sit=($('rpSit').value||'').trim();if(!sit)return toast('Describe a situation first');if(!hasAI()){openSettings();return toast('Add an AI key in Settings to use role-play')}
   RP={sit,msgs:[],busy:true};render();await rpCall('Start the conversation with your first line.')}
 async function rpCall(txt){RP.busy=true;render();
   const contents=[];contents.push({role:'user',parts:[{text:'Start the conversation with your first line.'}]});
@@ -780,7 +814,7 @@ function langOpts(sel,withAuto){return(withAuto?`<option value="auto" ${sel==='a
 function vTranslate(v){
   const to=S.trTo||S.target,from=S.trFrom||'auto',ml=S.trMic||S.base;
   v.innerHTML=`<h2>Translate</h2><div class="mute">Talk the way you talk — slang, Tanglish, Hinglish, Manglish, half-English. It translates what you <i>mean</i>, the way a local would say it.</div>
-  ${S.key?'':`<div class="tip">🔑 The translator uses Google’s free Gemini AI. <a href="#" onclick="openSettings();return false">Add your free key in Settings</a> (takes 1 minute).</div>`}
+  ${hasAI()?'':`<div class="tip">🔑 The translator uses free AI (Gemini or Groq). <a href="#" onclick="openSettings();return false">Add your free key in Settings</a> (takes 1 minute).</div>`}
   <div class="card">
    <div class="row"><select id="trFrom" class="grow" style="width:auto" onchange="S.trFrom=this.value;save()">${langOpts(from,true)}</select><span>→</span><select id="trTo" class="grow" style="width:auto" onchange="S.trTo=this.value;save()">${langOpts(to)}</select></div>
    <textarea id="trIn" style="margin-top:10px" placeholder="e.g. Machi, semma traffic da, late aagum">${esc(TR&&TR.text||'')}</textarea>
@@ -801,7 +835,7 @@ function copyTxt(t){(navigator.clipboard?navigator.clipboard.writeText(t):Promis
 async function trMic(){const b=$('trMic'),l=$('trMicL').value;b.innerHTML='<span class="spin"></span>';try{const a=await listen(l);const el=$('trIn');el.value=(el.value?el.value+' ':'')+a[0]}catch(e){toast(e.message)}b.textContent='🎤 Speak'}
 async function doTranslate(){
   const text=($('trIn').value||'').trim();if(!text)return toast('Type or speak something first');
-  if(!S.key){openSettings();return toast('Add your Gemini key first')}
+  if(!hasAI()){openSettings();return toast('Add an AI key first')}
   const to=$('trTo').value,from=$('trFrom').value,T=LANGS[to].name,B=LANGS[S.base].name;
   const g=$('trGo');g.disabled=true;g.innerHTML='<span class="spin"></span> Translating…';
   const sys=`You are an expert interpreter for Tamil, English, Hindi, Malayalam and Spanish. You deeply understand street slang, Tanglish, Hinglish, Manglish, Spanglish, regional dialects (Madras Tamil, Kongu Tamil, Bambaiya Hindi, Thrissur/Kochi Malayalam…), code-mixing, typos and romanized text.
@@ -842,17 +876,21 @@ function openSettings(){
   <div class="mute small" style="margin-top:6px">Progress is kept separately for each language.</div>
   <label class="f">Daily goal</label><select id="stG">${[[30,'Casual · 30 XP'],[50,'Regular · 50 XP'],[100,'Serious · 100 XP'],[200,'Intense · 200 XP']].map(g=>`<option value="${g[0]}" ${S.goal==g[0]?'selected':''}>${g[1]}</option>`).join('')}</select>
   <label class="f">Speaking exercises</label><select id="stM"><option value="1" ${S.mic?'selected':''}>On — use the microphone</option><option value="0" ${!S.mic?'selected':''}>Off</option></select>
-  <label class="f">Gemini API key (for translator, AI lessons, role-play)</label>
+  <label class="f">Gemini API key (translator, AI lessons, role-play)</label>
   <input type="password" id="stK" value="${esc(S.key)}" placeholder="Paste key starting with AIza…" autocomplete="off">
   <div class="mute small" style="margin-top:6px">Paste it once — sign in with Google above and your other devices get it automatically. Free key: open <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> → “Create API key” → copy → paste here. It’s stored on this phone and, if you sign in, in your own Google Drive.</div>
-  <label class="f">Model (optional)</label><input type="text" id="stMo" value="${esc(S.model)}" placeholder="gemini-flash-latest">
+  <label class="f">Groq API key (free backup — used when Gemini is busy)</label>
+  <input type="password" id="stGq" value="${esc(S.groqKey||'')}" placeholder="Paste key starting with gsk_…" autocomplete="off">
+  <div class="mute small" style="margin-top:6px">Free: open <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a> → sign in with Google → “Create API Key” → copy → paste here.</div>
+  <label class="f">Which AI first?</label><select id="stEn"><option value="gemini" ${S.engine!=='groq'?'selected':''}>Gemini first (best slang), Groq if busy</option><option value="groq" ${S.engine==='groq'?'selected':''}>Groq first (fastest), Gemini if busy</option></select>
+  <label class="f">Gemini model (optional)</label><input type="text" id="stMo" value="${esc(S.model)}" placeholder="gemini-flash-latest">
   <button class="btn pri block" style="margin-top:18px" onclick="saveSettings()">Save</button>
   <div class="mute small" style="margin-top:16px">Voices on this device — ${vs}. If a voice is missing: Android Settings → Text-to-speech → Google → Install voice data.</div>
   <button class="btn ghost block" style="margin-top:14px;color:var(--bad)" onclick="resetAll()">Reset progress</button>`);
 }
-async function resetAll(){if(!confirm('Reset ALL progress, flashcards and history?'))return;const k=S.key,kt=S.keyT,mo=S.model,a=S.acct;S=def();S.key=k;S.keyT=kt;S.model=mo;S.acct=a;S.resetAt=Date.now();saveLocal();if(a&&gReady()){try{await driveWrite(syncData())}catch(e){}}location.reload()}
+async function resetAll(){if(!confirm('Reset ALL progress, flashcards and history?'))return;const k=S.key,kt=S.keyT,mo=S.model,a=S.acct,gk=S.groqKey,en=S.engine;S=def();S.key=k;S.keyT=kt;S.model=mo;S.acct=a;S.groqKey=gk;S.engine=en;S.resetAt=Date.now();saveLocal();if(a&&gReady()){try{await driveWrite(syncData())}catch(e){}}location.reload()}
 function saveSettings(){const b=$('stB').value,t=$('stT').value;if(b===t)return toast('Pick two different languages');
-  S.base=b;S.target=t;S.goal=+$('stG').value;S.mic=$('stM').value==='1';const nk=$('stK').value.trim(),nm=$('stMo').value.trim();if(nk!==S.key||nm!==S.model){S.key=nk;S.model=nm;S.keyT=Date.now()}save();if(S.acct&&!gReady()&&G.dirty)setTimeout(()=>toast('Tap ☁️ to sync this to your other devices'),2700);toast('Saved');closeModal()}
+  S.base=b;S.target=t;S.goal=+$('stG').value;S.mic=$('stM').value==='1';const nk=$('stK').value.trim(),nm=$('stMo').value.trim(),ng=$('stGq').value.trim(),ne=$('stEn').value;if(nk!==S.key||nm!==S.model||ng!==(S.groqKey||'')||ne!==(S.engine||'gemini')){S.key=nk;S.model=nm;S.groqKey=ng;S.engine=ne;S.keyT=Date.now()}save();if(S.acct&&!gReady()&&G.dirty)setTimeout(()=>toast('Tap ☁️ to sync this to your other devices'),2700);toast('Saved');closeModal()}
 
 /* ============ BOOT ============ */
 if(S.target)render();else onboard();
