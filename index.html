@@ -356,24 +356,34 @@ function listen(l){return new Promise(async(res,rej)=>{
 })}
 
 /* ============ GEMINI ============ */
+let goodModel=null;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function gemini(contents,sys,temp){
   if(!S.key)throw new Error('Add your free Gemini API key in Settings ⚙️ first.');
-  const models=[S.model,'gemini-flash-latest','gemini-2.5-flash','gemini-2.0-flash'].filter((v,i,a)=>v&&a.indexOf(v)===i);
+  const models=[goodModel,S.model,'gemini-flash-latest','gemini-2.5-flash','gemini-flash-lite-latest','gemini-2.5-flash-lite','gemini-2.0-flash'].filter((v,i,a)=>v&&a.indexOf(v)===i);
   let last=new Error('No model available');
   for(const m of models){
     const body={contents,generationConfig:{temperature:temp==null?.4:temp,responseMimeType:'application/json'}};
     if(sys)body.systemInstruction={parts:[{text:sys}]};
-    let res;
-    try{res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(m)+':generateContent?key='+encodeURIComponent(S.key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})}
-    catch(e){throw new Error('No internet connection — the translator and AI features need the internet.')}
-    const j=await res.json().catch(()=>({}));
-    if(res.status===404){last=new Error('Model '+m+' not found');continue}
-    if(!res.ok)throw new Error((j.error&&j.error.message)||('Gemini error '+res.status));
-    const parts=(((j.candidates||[])[0]||{}).content||{}).parts||[];
-    const t=parts.filter(p=>!p.thought).map(p=>p.text||'').join('');
-    if(!t)throw new Error('Gemini gave no answer (it may have been blocked). Try rephrasing.');
-    try{return JSON.parse(t)}catch(e){const mm=t.match(/[\[{][\s\S]*[\]}]/);if(mm)return JSON.parse(mm[0]);throw new Error('Could not read the AI reply')}
+    for(let attempt=0;attempt<2;attempt++){
+      let res;
+      try{res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(m)+':generateContent?key='+encodeURIComponent(S.key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})}
+      catch(e){throw new Error('No internet connection — the translator and AI features need the internet.')}
+      const j=await res.json().catch(()=>({}));
+      const msg=(j.error&&j.error.message)||('Gemini error '+res.status);
+      if(res.status===400&&/api key/i.test(msg))throw new Error('Your Gemini key isn’t valid — check it in Settings ⚙️');
+      if(res.status===403)throw new Error('Gemini refused the key: '+msg);
+      if(res.status===404||res.status===400){last=new Error(msg);break}            // model missing → next model
+      if(res.status===429||res.status>=500){last=new Error(msg);if(attempt===0&&res.status!==429){await sleep(1200);continue}break} // busy → retry once, then next model
+      if(!res.ok)throw new Error(msg);
+      const parts=(((j.candidates||[])[0]||{}).content||{}).parts||[];
+      const t=parts.filter(p=>!p.thought).map(p=>p.text||'').join('');
+      if(!t){last=new Error('Gemini gave no answer (it may have been blocked). Try rephrasing.');break}
+      let out;try{out=JSON.parse(t)}catch(e){const mm=t.match(/[\[{][\s\S]*[\]}]/);if(!mm){last=new Error('Could not read the AI reply');break}out=JSON.parse(mm[0])}
+      goodModel=m;return out;
+    }
   }
+  if(/high demand|overloaded|unavailable|quota|exhausted|rate/i.test(last.message))throw new Error('Gemini is busy right now (all models). Wait a minute and try again.');
   throw last;
 }
 
