@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mozhi — learn &amp; translate</title>
+<meta name="theme-color" content="#0f5c55">
+<meta name="description" content="Learn Tamil, Hindi, Malayalam, English and Spanish — lessons, script, flashcards, conversations and a slang-aware translator.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--bg:#f5f2ea;--card:#fff;--ink:#1c2420;--mute:#67726c;--line:#e3ddd0;--pri:#0f5c55;--pri2:#e4f0ed;--acc:#e08a26;--acc2:#fbefdf;--ok:#2c8a4a;--okbg:#e3f3e7;--bad:#c2452d;--badbg:#fbe8e3;--sh:0 1px 2px rgba(0,0,0,.05),0 4px 14px rgba(0,0,0,.05)}
+@media (prefers-color-scheme:dark){:root{--bg:#111614;--card:#1a211f;--ink:#e8eeeb;--mute:#93a09a;--line:#2a3330;--pri:#5cc2b5;--pri2:#1c3330;--acc:#f0a54a;--acc2:#3a2c18;--ok:#5fcf85;--okbg:#16301f;--bad:#ff8a73;--badbg:#3a1d17;--sh:none}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans","Noto Sans Tamil","Noto Sans Devanagari","Noto Sans Malayalam",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.45}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;background:var(--bg)}
+.logo{font-weight:800;font-size:21px;letter-spacing:-.3px;color:var(--pri);flex:1}
+.logo small{font-weight:600;font-size:12px;color:var(--mute);margin-left:6px}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:99px;background:var(--card);border:1px solid var(--line);font-weight:700;font-size:14px}
+.iconbtn{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--card);border:1px solid var(--line);font-size:17px}
+main{padding:4px 16px calc(96px + env(safe-area-inset-bottom));max-width:640px;margin:0 auto}
+nav{position:fixed;bottom:0;left:0;right:0;z-index:6;display:flex;background:var(--card);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 0;font-size:11px;font-weight:600;color:var(--mute);border-radius:12px}
+nav button span{font-size:21px;line-height:1.2;filter:grayscale(.6);opacity:.75}
+nav button.on{color:var(--pri)}nav button.on span{filter:none;opacity:1}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin:12px 0;box-shadow:var(--sh)}
+.hero{background:var(--pri);color:#fff;border:0}
+@media (prefers-color-scheme:dark){.hero{background:#164a44}}
+.hero .mute{color:rgba(255,255,255,.75)}
+h2{font-size:19px;margin:18px 0 6px}h3{font-size:16px;margin:0 0 4px}
+.mute{color:var(--mute);font-size:14px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.grow{flex:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 18px;border-radius:14px;font-weight:700;background:var(--pri2);color:var(--pri)}
+.btn.pri{background:var(--pri);color:#fff}
+@media (prefers-color-scheme:dark){.btn.pri{color:#0b1f1c}}
+.btn.acc{background:var(--acc);color:#fff}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.btn.block{width:100%}
+.btn:disabled{opacity:.45}
+.hero .btn{background:#fff;color:var(--pri)}
+.bar{height:9px;border-radius:9px;background:var(--line);overflow:hidden}
+.hero .bar{background:rgba(255,255,255,.25)}
+.bar i{display:block;height:100%;background:var(--acc);border-radius:9px;transition:width .3s}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;text-align:center}
+.stat b{display:block;font-size:22px}
+.seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:4px;gap:4px;margin:8px 0}
+.seg button{flex:1;padding:9px;border-radius:10px;font-weight:700;font-size:14px;color:var(--mute)}
+.seg button.on{background:var(--pri2);color:var(--pri)}
+.unit{display:flex;align-items:center;gap:14px;padding:14px;background:var(--card);border:1px solid var(--line);border-radius:16px;margin:10px 0;width:100%;text-align:left}
+.unit .ic{width:46px;height:46px;border-radius:14px;background:var(--acc2);display:grid;place-items:center;font-size:24px;flex:none}
+.unit.done .ic{background:var(--okbg)}
+.unit .tk{margin-left:auto;font-weight:800;color:var(--ok)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px}
+.let{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 2px;text-align:center}
+.let b{display:block;font-size:26px;font-weight:600}
+.let small{color:var(--mute);font-size:12px}
+.tip{background:var(--acc2);border-radius:14px;padding:12px 14px;margin:8px 0;font-size:15px}
+input[type=text],input[type=password],select,textarea{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--bg);outline:none}
+textarea{min-height:96px;resize:vertical}
+input:focus,select:focus,textarea:focus{border-color:var(--pri)}
+label.f{display:block;font-weight:700;font-size:14px;margin:14px 0 6px}
+.tr-out .big{font-size:24px;font-weight:600;line-height:1.35}
+.rom{color:var(--pri);font-weight:600}
+.small{font-size:13px}
+.hist{padding:10px 0;border-bottom:1px solid var(--line)}
+.bubble{max-width:86%;padding:10px 14px;border-radius:18px;margin:8px 0;background:var(--card);border:1px solid var(--line)}
+.bubble.me{margin-left:auto;background:var(--pri2);border-color:transparent}
+.bubble .s{font-size:19px;font-weight:600}
+.bubble .who{font-size:12px;font-weight:700;color:var(--mute);margin-bottom:2px}
+.hidebox{filter:blur(6px);user-select:none}
+.fb{font-size:14px;margin-top:6px;padding:8px 10px;border-radius:10px;background:var(--acc2)}
+/* stage */
+#stage{position:fixed;inset:0;z-index:20;background:var(--bg);display:flex;flex-direction:column;overflow:auto}
+#stage[hidden],#modal[hidden]{display:none}
+.stop{display:flex;align-items:center;gap:12px;padding:calc(12px + env(safe-area-inset-top)) 16px 8px;max-width:640px;width:100%;margin:0 auto}
+.stop .bar{flex:1;height:12px}
+.sbody{flex:1;padding:12px 18px;max-width:640px;width:100%;margin:0 auto;display:flex;flex-direction:column}
+.prompt{font-weight:800;font-size:19px;margin:6px 0 14px}
+.bigword{font-size:38px;font-weight:600;line-height:1.3;text-align:center;margin:14px 0 2px;word-break:break-word}
+.bigsub{text-align:center;color:var(--pri);font-weight:600;font-size:18px}
+.meaning{text-align:center;font-size:18px;margin-top:10px}
+.spk{display:flex;justify-content:center;gap:10px;margin:14px 0}
+.round{width:56px;height:56px;border-radius:50%;background:var(--pri2);font-size:24px;display:grid;place-items:center}
+.round.xl{width:96px;height:96px;font-size:40px;background:var(--pri);color:#fff}
+.opts{display:grid;gap:10px;margin-top:8px}
+.opt{padding:14px 16px;border-radius:16px;border:2px solid var(--line);background:var(--card);text-align:left;font-size:18px;font-weight:600}
+.opt small{display:block;font-size:14px;font-weight:600;color:var(--pri)}
+.opt.ok{border-color:var(--ok);background:var(--okbg)}
+.opt.bad{border-color:var(--bad);background:var(--badbg)}
+.tokens{display:flex;flex-wrap:wrap;gap:8px;min-height:62px;padding:10px;border-radius:16px;border:2px dashed var(--line);margin-bottom:14px}
+.tok{padding:9px 13px;border-radius:12px;background:var(--card);border:2px solid var(--line);font-size:18px;font-weight:600;text-align:center;line-height:1.2}
+.tok small{display:block;font-size:12px;color:var(--pri)}
+.tok.used{visibility:hidden}
+.foot{position:sticky;bottom:0;padding:14px 18px calc(14px + env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--line)}
+.foot.ok{background:var(--okbg);border-color:transparent}.foot.bad{background:var(--badbg);border-color:transparent}
+.foot .msg{font-weight:800;margin-bottom:4px}.foot.ok .msg{color:var(--ok)}.foot.bad .msg{color:var(--bad)}
+.foot .ans{font-size:15px;margin-bottom:10px}
+.foot-in{max-width:640px;margin:0 auto}
+.fcard{min-height:260px;display:flex;flex-direction:column;justify-content:center}
+.center{text-align:center}
+/* modal */
+#modal{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center}
+#modal .sheet{background:var(--card);width:100%;max-width:640px;max-height:92vh;overflow:auto;border-radius:22px 22px 0 0;padding:20px 18px calc(24px + env(safe-area-inset-bottom))}
+.langs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lb{padding:12px;border-radius:14px;border:2px solid var(--line);background:var(--bg);text-align:left;font-weight:700}
+.lb small{display:block;color:var(--mute);font-weight:600}
+.lb.on{border-color:var(--pri);background:var(--pri2)}
+.lb:disabled{opacity:.35}
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;font-weight:600;z-index:40;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+#toast.on{opacity:1}
+.spin{display:inline-block;width:18px;height:18px;border:3px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .8s linear infinite;vertical-align:middle}
+@keyframes sp{to{transform:rotate(360deg)}}
+a{color:var(--pri)}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Mozhi<small id="course"></small></div>
+  <span class="chip" id="streakChip" title="Day streak">🔥 0</span>
+  <button class="iconbtn" onclick="openSettings()" aria-label="Settings">⚙️</button>
+</header>
+<main id="view"></main>
+<nav id="nav">
+  <button data-t="home"><span>🏠</span>Home</button>
+  <button data-t="learn"><span>📚</span>Learn</button>
+  <button data-t="review"><span>🔁</span>Review</button>
+  <button data-t="talk"><span>💬</span>Talk</button>
+  <button data-t="translate"><span>🌐</span>Translate</button>
+</nav>
+<div id="stage" hidden></div>
+<div id="modal" hidden onclick="if(event.target===this&&S.target)closeModal()"><div class="sheet" id="sheet"></div></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ============ LANGUAGES ============ */
+const LANGS={
+  ta:{name:'Tamil',native:'தமிழ்',tts:'ta-IN',script:true},
+  en:{name:'English',native:'English',tts:'en-IN',script:false},
+  hi:{name:'Hindi',native:'हिन्दी',tts:'hi-IN',script:true},
+  ml:{name:'Malayalam',native:'മലയാളം',tts:'ml-IN',script:true},
+  es:{name:'Spanish',native:'Español',tts:'es-ES',script:false}
+};
+const ORDER=['ta','en','hi','ml','es'];
+const COLS=['en','es','hi','ta','ml']; // data column order after id
+
+/* ============ COURSE DATA ============ */
+/* row: [id, English, Spanish, Hindi 'script|roman', Tamil, Malayalam] */
+const UNITS=[
+{id:'greet',title:'Greetings',icon:'👋',rows:[
+['g1','Hello','Hola','नमस्ते|namaste','வணக்கம்|vanakkam','നമസ്കാരം|namaskaaram'],
+['g2','Thank you','Gracias','धन्यवाद|dhanyavaad','நன்றி|nandri','നന്ദി|nandi'],
+['g3','How are you?','¿Cómo estás?','आप कैसे हैं?|aap kaise hain?','எப்படி இருக்கீங்க?|eppadi irukkeenga?','സുഖമാണോ?|sukhamaano?'],
+['g4','I am fine','Estoy bien','मैं ठीक हूँ|main theek hoon','நான் நல்லா இருக்கேன்|naan nallaa irukken','എനിക്ക് സുഖമാണ്|enikku sukhamaanu'],
+['g5','What is your name?','¿Cómo te llamas?','आपका नाम क्या है?|aapka naam kya hai?','உங்க பேரு என்ன?|unga peru enna?','നിങ്ങളുടെ പേര് എന്താണ്?|ningalude peru enthaanu?'],
+['g6','My name is Ravi','Me llamo Ravi','मेरा नाम रवि है|mera naam Ravi hai','என் பேரு ரவி|en peru Ravi','എന്റെ പേര് രവി|ente peru Ravi'],
+['g7','Yes','Sí','हाँ|haan','ஆமா|aamaa','അതെ|athe'],
+['g8','No','No','नहीं|nahin','இல்லை|illai','ഇല്ല|illa'],
+['g9','Sorry','Lo siento','माफ़ कीजिए|maaf keejiye','மன்னிக்கணும்|mannikkanum','ക്ഷമിക്കണം|kshamikkanam'],
+['g10','See you later','Hasta luego','फिर मिलेंगे|phir milenge','அப்புறம் பார்க்கலாம்|appuram paarkalaam','പിന്നെ കാണാം|pinne kaanaam']]},
+{id:'num',title:'Numbers',icon:'🔢',rows:[
+['n1','One','Uno','एक|ek','ஒன்று|ondru','ഒന്ന്|onnu'],
+['n2','Two','Dos','दो|do','இரண்டு|irandu','രണ്ട്|randu'],
+['n3','Three','Tres','तीन|teen','மூன்று|moondru','മൂന്ന്|moonnu'],
+['n4','Four','Cuatro','चार|chaar','நான்கு|naangu','നാല്|naalu'],
+['n5','Five','Cinco','पाँच|paanch','ஐந்து|aindhu','അഞ്ച്|anchu'],
+['n6','Six','Seis','छह|chhah','ஆறு|aaru','ആറ്|aaru'],
+['n7','Seven','Siete','सात|saat','ஏழு|ezhu','ഏഴ്|ezhu'],
+['n8','Eight','Ocho','आठ|aath','எட்டு|ettu','എട്ട്|ettu'],
+['n9','Nine','Nueve','नौ|nau','ஒன்பது|onbadhu','ഒമ്പത്|ompathu'],
+['n10','Ten','Diez','दस|das','பத்து|pathu','പത്ത്|pathu'],
+['n11','Hundred','Cien','सौ|sau','நூறு|nooru','നൂറ്|nooru']]},
+{id:'food',title:'Food & eating',icon:'🍛',rows:[
+['f1','Water','Agua','पानी|paani','தண்ணீர்|thanneer','വെള്ളം|vellam'],
+['f2','Food','Comida','खाना|khaana','சாப்பாடு|saappaadu','ഭക്ഷണം|bhakshanam'],
+['f3','Rice','Arroz','चावल|chaawal','சாதம்|saadham','ചോറ്|choru'],
+['f4','Tea','Té','चाय|chaay','டீ|tee','ചായ|chaaya'],
+['f5','Coffee','Café','कॉफ़ी|coffee','காபி|kaapi','കാപ്പി|kaappi'],
+['f6','I am hungry','Tengo hambre','मुझे भूख लगी है|mujhe bhookh lagi hai','எனக்கு பசிக்குது|enakku pasikkudhu','എനിക്ക് വിശക്കുന്നു|enikku vishakkunnu'],
+['f7','Less spicy, please','Poco picante, por favor','मिर्च कम डालिए|mirch kam daaliye','காரம் கம்மியா போடுங்க|kaaram kammiyaa podunga','എരിവ് കുറച്ച് മതി|erivu kurachu mathi'],
+['f8','The bill, please','La cuenta, por favor','बिल दीजिए|bill deejiye','பில் குடுங்க|bill kudunga','ബില്ല് തരൂ|billu tharoo'],
+['f9','It is very tasty','Está muy rico','बहुत स्वादिष्ट है|bahut swaadisht hai','ரொம்ப ருசியா இருக்கு|romba rusiyaa irukku','നല്ല രുചിയുണ്ട്|nalla ruchiyundu']]},
+{id:'travel',title:'Getting around',icon:'🛺',rows:[
+['t1','Where is the bus stand?','¿Dónde está la parada de autobús?','बस स्टैंड कहाँ है?|bus stand kahaan hai?','பஸ் ஸ்டாண்ட் எங்கே இருக்கு?|bus stand enge irukku?','ബസ് സ്റ്റാൻഡ് എവിടെയാണ്?|bus stand evideyaanu?'],
+['t2','Go straight','Siga recto','सीधे जाइए|seedhe jaaiye','நேரா போங்க|neraa ponga','നേരെ പോകൂ|nere pokoo'],
+['t3','Turn right','Gire a la derecha','दाएँ मुड़िए|daayen mudiye','வலது பக்கம் திரும்புங்க|valadhu pakkam thirumbunga','വലത്തോട്ട് തിരിയൂ|valathottu thiriyoo'],
+['t4','Turn left','Gire a la izquierda','बाएँ मुड़िए|baayen mudiye','இடது பக்கம் திரும்புங்க|idadhu pakkam thirumbunga','ഇടത്തോട്ട് തിരിയൂ|idathottu thiriyoo'],
+['t5','Stop here','Pare aquí','यहाँ रोकिए|yahaan rokiye','இங்கே நிறுத்துங்க|inge niruthunga','ഇവിടെ നിർത്തൂ|ivide nirthoo'],
+['t6','How far is it?','¿Qué tan lejos está?','कितनी दूर है?|kitni door hai?','எவ்வளவு தூரம்?|evvalavu dhooram?','എത്ര ദൂരമുണ്ട്?|ethra dooramundu?'],
+['t7','Ticket','El billete','टिकट|ticket','டிக்கெட்|ticket','ടിക്കറ്റ്|ticket'],
+['t8','Railway station','La estación de tren','रेलवे स्टेशन|railway station','ரயில்வே ஸ்டேஷன்|railway station','റെയിൽവേ സ്റ്റേഷൻ|railway station']]},
+{id:'shop',title:'Shopping & money',icon:'🛍️',rows:[
+['s1','How much is this?','¿Cuánto cuesta esto?','यह कितने का है?|yeh kitne ka hai?','இது எவ்வளவு?|idhu evvalavu?','ഇതിന് എത്രയാണ്?|ithinu ethrayaanu?'],
+['s2','It is too expensive','Es muy caro','बहुत महँगा है|bahut mehenga hai','ரொம்ப விலை அதிகம்|romba vilai adhigam','വില കൂടുതലാണ്|vila kooduthalaanu'],
+['s3','Reduce the price a little','¿Puede bajar un poco?','थोड़ा कम कीजिए|thoda kam keejiye','கொஞ்சம் குறைச்சுக்கோங்க|konjam kuraichukkonga','കുറച്ച് കുറയ്ക്കാമോ?|kurachu kuraykkaamo?'],
+['s4','I want this','Quiero esto','मुझे यह चाहिए|mujhe yeh chaahiye','எனக்கு இது வேணும்|enakku idhu venum','എനിക്ക് ഇത് വേണം|enikku ithu venam'],
+['s5',"I don't want it",'No lo quiero','मुझे नहीं चाहिए|mujhe nahin chaahiye','எனக்கு வேண்டாம்|enakku vendaam','എനിക്ക് വേണ്ട|enikku venda'],
+['s6','Money','Dinero','पैसा|paisa','பணம்|panam','പണം|panam'],
+['s7','Shop','Tienda','दुकान|dukaan','கடை|kadai','കട|kada'],
+['s8','Do you have change?','¿Tiene cambio?','छुट्टे हैं?|chhutte hain?','சில்லறை இருக்கா?|chillarai irukkaa?','ചില്ലറ ഉണ്ടോ?|chillara undo?']]},
+{id:'family',title:'Family & people',icon:'👨‍👩‍👧',rows:[
+['p1','Mother','Madre','माँ|maa','அம்மா|ammaa','അമ്മ|amma'],
+['p2','Father','Padre','पापा|papa','அப்பா|appaa','അച്ഛൻ|achan'],
+['p3','Elder brother','Hermano mayor','बड़ा भाई|bada bhai','அண்ணா|annaa','ചേട്ടൻ|chettan'],
+['p4','Elder sister','Hermana mayor','दीदी|didi','அக்கா|akkaa','ചേച്ചി|chechi'],
+['p5','Younger brother','Hermano menor','छोटा भाई|chhota bhai','தம்பி|thambi','അനിയൻ|aniyan'],
+['p6','Younger sister','Hermana menor','छोटी बहन|chhoti behen','தங்கச்சி|thangachi','അനിയത്തി|aniyathi'],
+['p7','Friend','Amigo','दोस्त|dost','நண்பன்|nanban','സുഹൃത്ത്|suhruthu'],
+['p8','Child','Niño','बच्चा|bachcha','குழந்தை|kuzhandhai','കുട്ടി|kutti']]},
+{id:'time',title:'Time & days',icon:'⏰',rows:[
+['ti1','Today','Hoy','आज|aaj','இன்னைக்கு|innaikku','ഇന്ന്|innu'],
+['ti2','Tomorrow','Mañana','कल|kal','நாளைக்கு|naalaikku','നാളെ|naale'],
+['ti3','Now','Ahora','अभी|abhi','இப்போ|ippo','ഇപ്പോൾ|ippol'],
+['ti4','Morning','La mañana','सुबह|subah','காலை|kaalai','രാവിലെ|raavile'],
+['ti5','Night','La noche','रात|raat','ராத்திரி|raathiri','രാത്രി|raathri'],
+['ti6','What time is it?','¿Qué hora es?','कितने बजे हैं?|kitne baje hain?','மணி என்ன?|mani enna?','സമയം എത്രയായി?|samayam ethrayaayi?'],
+['ti7','Week','Semana','हफ़्ता|hafta','வாரம்|vaaram','ആഴ്ച|aazhcha'],
+['ti8','Sunday','Domingo','रविवार|ravivaar','ஞாயிறு|nyaayiru','ഞായർ|njaayar']]},
+{id:'ask',title:'Questions & basics',icon:'❓',rows:[
+['q1','What?','¿Qué?','क्या?|kya?','என்ன?|enna?','എന്ത്?|enthu?'],
+['q2','Where?','¿Dónde?','कहाँ?|kahaan?','எங்கே?|enge?','എവിടെ?|evide?'],
+['q3','When?','¿Cuándo?','कब?|kab?','எப்போ?|eppo?','എപ്പോൾ?|eppol?'],
+['q4','Why?','¿Por qué?','क्यों?|kyon?','ஏன்?|yen?','എന്തിന്?|enthinu?'],
+['q5','Come','Ven','आइए|aaiye','வாங்க|vaanga','വരൂ|varoo'],
+['q6','Go','Ve','जाइए|jaaiye','போங்க|ponga','പോകൂ|pokoo'],
+['q7',"I don't understand",'No entiendo','मुझे समझ नहीं आया|mujhe samajh nahin aaya','எனக்கு புரியலை|enakku puriyalai','എനിക്ക് മനസ്സിലായില്ല|enikku manassilaayilla'],
+['q8','Please speak slowly','Hable despacio, por favor','धीरे बोलिए|dheere boliye','மெதுவா பேசுங்க|medhuvaa pesunga','പതുക്കെ പറയൂ|pathukke parayoo'],
+['q9','Do you speak English?','¿Habla inglés?','क्या आप अंग्रेज़ी बोलते हैं?|kya aap angrezi bolte hain?','உங்களுக்கு இங்கிலீஷ் தெரியுமா?|ungalukku English theriyumaa?','നിങ്ങൾക്ക് ഇംഗ്ലീഷ് അറിയാമോ?|ningalkku English ariyaamo?']]},
+{id:'help',title:'Emergencies',icon:'🚑',rows:[
+['h1','Help!','¡Ayuda!','बचाओ!|bachaao!','காப்பாத்துங்க!|kaappaathunga!','രക്ഷിക്കണേ!|rakshikkane!'],
+['h2','I need a doctor','Necesito un médico','मुझे डॉक्टर चाहिए|mujhe doctor chaahiye','எனக்கு டாக்டர் வேணும்|enakku doctor venum','എനിക്ക് ഡോക്ടറെ കാണണം|enikku doctore kaananam'],
+['h3','Hospital','Hospital','अस्पताल|aspataal','ஆஸ்பத்திரி|aaspathiri','ആശുപത്രി|aashupathri'],
+['h4','Call the police','Llame a la policía','पुलिस को बुलाइए|police ko bulaaiye','போலீஸைக் கூப்பிடுங்க|police-ai koopidunga','പോലീസിനെ വിളിക്കൂ|policine vilikkoo'],
+['h5','Where is the toilet?','¿Dónde está el baño?','टॉयलेट कहाँ है?|toilet kahaan hai?','டாய்லெட் எங்கே?|toilet enge?','ടോയ്‌ലറ്റ് എവിടെയാണ്?|toilet evideyaanu?'],
+['h6','I am lost','Estoy perdido','मैं रास्ता भूल गया हूँ|main raasta bhool gaya hoon','நான் வழி தவறிட்டேன்|naan vazhi thavaritten','എനിക്ക് വഴി തെറ്റി|enikku vazhi thetti'],
+['h7','It hurts here','Me duele aquí','यहाँ दर्द है|yahaan dard hai','இங்கே வலிக்குது|inge valikkudhu','ഇവിടെ വേദനയുണ്ട്|ivide vedanayundu'],
+['h8','Medicine','Medicina','दवाई|davaai','மருந்து|marundhu','മരുന്ന്|marunnu']]},
+{id:'sent',title:'Building sentences',icon:'🧩',grammar:true,rows:[
+['x1','I am going home','Voy a casa','मैं घर जा रहा हूँ|main ghar ja raha hoon','நான் வீட்டுக்கு போறேன்|naan veettukku poren','ഞാൻ വീട്ടിൽ പോകുന്നു|njaan veettil pokunnu'],
+['x2','I am drinking water','Estoy bebiendo agua','मैं पानी पी रहा हूँ|main paani pee raha hoon','நான் தண்ணீர் குடிக்கிறேன்|naan thanneer kudikkiren','ഞാൻ വെള്ളം കുടിക്കുന്നു|njaan vellam kudikkunnu'],
+['x3','She is my younger sister','Ella es mi hermana menor','वह मेरी छोटी बहन है|vah meri chhoti behen hai','அவ என் தங்கச்சி|ava en thangachi','അവൾ എന്റെ അനിയത്തിയാണ്|aval ente aniyathiyaanu'],
+['x4','We will go tomorrow','Iremos mañana','हम कल जाएँगे|hum kal jaayenge','நாங்க நாளைக்கு போவோம்|naanga naalaikku povom','ഞങ്ങൾ നാളെ പോകും|njangal naale pokum'],
+['x5','I have eaten','Ya comí','मैंने खाना खा लिया|maine khaana kha liya','நான் சாப்பிட்டேன்|naan saappitten','ഞാൻ ഭക്ഷണം കഴിച്ചു|njaan bhakshanam kazhichu'],
+['x6','This is my house','Esta es mi casa','यह मेरा घर है|yeh mera ghar hai','இது என் வீடு|idhu en veedu','ഇത് എന്റെ വീടാണ്|ithu ente veedaanu'],
+['x7','I like tea','Me gusta el té','मुझे चाय पसंद है|mujhe chaay pasand hai','எனக்கு டீ பிடிக்கும்|enakku tee pidikkum','എനിക്ക് ചായ ഇഷ്ടമാണ്|enikku chaaya ishtamaanu'],
+['x8','Where are you going?','¿Adónde vas?','आप कहाँ जा रहे हैं?|aap kahaan ja rahe hain?','எங்கே போறீங்க?|enge poreenga?','നിങ്ങൾ എവിടെ പോകുന്നു?|ningal evide pokunnu?']]}
+];
+const DATA={};
+UNITS.forEach(u=>{u.items=u.rows.map(r=>{const it={id:r[0]};COLS.forEach((c,i)=>it[c]=r[i+1]);DATA[r[0]]=it;return r[0];});});
+
+const TIPS={
+hi:['Verb comes last: “मैं घर जा रहा हूँ” (main ghar ja raha hoon) = I · home · going am.','Use आप (aap) with strangers and elders, तुम (tum) with friends.','Verbs change with gender: a man says “gaya” (went), a woman says “gayi”.','Put क्या (kya) in front to make a yes/no question: “kya aap aayenge?” (will you come?).','Little words come after the noun: “ghar mein” = in the house, “mere liye” = for me.'],
+ta:['Verb comes last: “நான் வீட்டுக்கு போறேன்” (naan veettukku poren) = I · to-home · go.','The verb ending tells who acts: -en (I), -om (we), -eenga (you, polite), -aan (he), -aa (she).','Add -nga to sound polite: “vaa” → “vaanga” (please come), “po” → “ponga”.','Add -aa at the end to ask a yes/no question: “irukku” (there is) → “irukkaa?” (is there?).','Endings stick to nouns: veedu (house) → veettukku (to the house), veettula (in the house).'],
+ml:['Verb comes last: “ഞാൻ വീട്ടിൽ പോകുന്നു” (njaan veettil pokunnu) = I · at-home · go.','Good news: verbs don’t change for I / you / he: “njaan pokunnu”, “avan pokunnu”.','Add -o to ask a yes/no question: “undu” (there is) → “undo?” (is there?).','Polite requests: -oo or -aamo: “tharoo” (please give), “tharaamo?” (could you give?).','-il means in/at: veedu (house) → veettil (at home).'],
+es:['Word order is like English: subject – verb – object.','The subject is often dropped: “Voy” already means “I go”.','Nouns are masculine (el) or feminine (la): el té, la casa.','Questions start with ¿ and end with ? — ¿Dónde está?','Two verbs for “to be”: ser (what something is) and estar (states, places): “Estoy bien”.'],
+en:['Word order is subject – verb – object: “I drink water”.','For actions happening now use am/is/are + -ing: “I am going”.','Questions start with a question word or do/does: “Where is it?”, “Do you speak Tamil?”','Add “please” to sound polite: “Water, please”.','Use “a” before consonant sounds, “an” before vowel sounds: a bus, an auto.']
+};
+
+const SCRIPT={
+hi:{'Vowels':'अ a,आ aa,इ i,ई ee,उ u,ऊ oo,ए e,ऐ ai,ओ o,औ au','Consonants':'क ka,ख kha,ग ga,घ gha,च cha,छ chha,ज ja,झ jha,ट ṭa,ठ ṭha,ड ḍa,ढ ḍha,ण ṇa,त ta,थ tha,द da,ध dha,न na,प pa,फ pha,ब ba,भ bha,म ma,य ya,र ra,ल la,व va,श sha,ष ṣha,स sa,ह ha','Vowel signs':'क ka,का kaa,कि ki,की kee,कु ku,कू koo,के ke,कै kai,को ko,कौ kau,कं kam,क् k'},
+ta:{'Vowels':'அ a,ஆ aa,இ i,ஈ ee,உ u,ஊ oo,எ e,ஏ ē,ஐ ai,ஒ o,ஓ ō,ஔ au','Consonants':'க ka,ங nga,ச cha,ஞ nya,ட ṭa,ண ṇa,த tha,ந na,ப pa,ம ma,ய ya,ர ra,ல la,வ va,ழ zha,ள ḷa,ற ṟa,ன ṉa','Vowel signs':'க ka,கா kaa,கி ki,கீ kee,கு ku,கூ koo,கெ ke,கே kē,கை kai,கொ ko,கோ kō,க் k'},
+ml:{'Vowels':'അ a,ആ aa,ഇ i,ഈ ee,ഉ u,ഊ oo,ഋ ru,എ e,ഏ ē,ഐ ai,ഒ o,ഓ ō,ഔ au','Consonants':'ക ka,ഖ kha,ഗ ga,ഘ gha,ങ nga,ച cha,ഛ chha,ജ ja,ഝ jha,ഞ nja,ട ṭa,ഠ ṭha,ഡ ḍa,ഢ ḍha,ണ ṇa,ത tha,ഥ thha,ദ da,ധ dha,ന na,പ pa,ഫ pha,ബ ba,ഭ bha,മ ma,യ ya,ര ra,ല la,വ va,ശ sha,ഷ ṣha,സ sa,ഹ ha,ള ḷa,ഴ zha,റ ṟa','Vowel signs':'ക ka,കാ kaa,കി ki,കീ kee,കു ku,കൂ koo,കെ ke,കേ kē,കൈ kai,കൊ ko,കോ kō,ക് k'}
+};
+const LATIN_NOTES={
+es:[['ñ','ny — España (es-pa-nya)'],['ll','y — calle (ka-ye)'],['j','strong h — jefe (he-fe)'],['h','silent — hola (o-la)'],['rr','rolled r — perro'],['v','soft b — vino (bi-no)'],['qu','k — queso (ke-so)'],['z','s (Latin America) / th (Spain)'],['á é í ó ú','accent shows the stressed syllable']],
+en:[['th','think / this — tongue between teeth'],['w vs v','w: round lips (water) · v: teeth on lip (van)'],['silent letters','knife, write, hour'],['-ed','walked (t), played (d), wanted (id)'],['a','cat, cake, car — same letter, different sounds'],['stress','PHOto · phoTOgraphy — stress changes']]
+};
+
+const SCENES=[
+{id:'tea',title:'At a tea shop',icon:'☕',lines:[
+['a','Two teas, please','Dos tés, por favor','दो चाय दीजिए|do chaay deejiye','ரெண்டு டீ குடுங்க|rendu tee kudunga','രണ്ട് ചായ തരൂ|randu chaaya tharoo'],
+['b','With sugar?','¿Con azúcar?','चीनी डालूँ?|cheeni daaloon?','சர்க்கரை போடவா?|sakkarai podavaa?','പഞ്ചസാര ഇടട്ടെ?|panchasaara idatte?'],
+['a','Less sugar','Poco azúcar','चीनी कम|cheeni kam','சர்க்கரை கம்மியா|sakkarai kammiyaa','പഞ്ചസാര കുറച്ച്|panchasaara kurachu'],
+['b','Twenty rupees','Veinte rupias','बीस रुपये|bees rupaye','இருபது ரூபாய்|irubadhu roobaai','ഇരുപത് രൂപ|irupathu roopa'],
+['a','Here, take it','Aquí tiene','ये लीजिए|ye leejiye','இந்தாங்க|indhaanga','ഇതാ|ithaa']]},
+{id:'auto',title:'Taking an auto',icon:'🛺',lines:[
+['a','Will you come to the railway station?','¿Me lleva a la estación de tren?','रेलवे स्टेशन चलोगे?|railway station chaloge?','ரயில்வே ஸ்டேஷன் வருவீங்களா?|railway station varuveengalaa?','റെയിൽവേ സ്റ്റേഷനിലേക്ക് വരുമോ?|railway stationilekku varumo?'],
+['b','Yes, 150 rupees','Sí, ciento cincuenta rupias','हाँ, डेढ़ सौ रुपये|haan, dedh sau rupaye','ஆமா, நூத்தம்பது ரூபாய்|aamaa, noothambadhu roobaai','അതെ, നൂറ്റമ്പത് രൂപ|athe, noottampathu roopa'],
+['a','Too much! 100 rupees','¡Es mucho! Cien rupias','बहुत ज़्यादा है! सौ रुपये|bahut zyaada hai! sau rupaye','ரொம்ப அதிகம்! நூறு ரூபாய்|romba adhigam! nooru roobaai','വളരെ കൂടുതലാണ്! നൂറ് രൂപ|valare kooduthalaanu! nooru roopa'],
+['b','OK, get in','Vale, suba','ठीक है, बैठिए|theek hai, baithiye','சரி, ஏறுங்க|sari, erunga','ശരി, കയറൂ|shari, kayaroo']]},
+{id:'dir',title:'Asking the way',icon:'🧭',lines:[
+['a','Excuse me, where is the hospital?','Disculpe, ¿dónde está el hospital?','सुनिए, अस्पताल कहाँ है?|suniye, aspataal kahaan hai?','ஒரு நிமிஷம், ஆஸ்பத்திரி எங்கே இருக்கு?|oru nimisham, aaspathiri enge irukku?','ക്ഷമിക്കണം, ആശുപത്രി എവിടെയാണ്?|kshamikkanam, aashupathri evideyaanu?'],
+['b','Go straight, then turn left','Siga recto y luego gire a la izquierda','सीधे जाइए, फिर बाएँ मुड़िए|seedhe jaaiye, phir baayen mudiye','நேரா போய் இடது பக்கம் திரும்புங்க|neraa poi idadhu pakkam thirumbunga','നേരെ പോയി ഇടത്തോട്ട് തിരിയൂ|nere poyi idathottu thiriyoo'],
+['a','Is it far?','¿Está lejos?','दूर है?|door hai?','தூரமா?|dhooramaa?','ദൂരമുണ്ടോ?|dooramundo?'],
+['b','No, five minutes','No, cinco minutos','नहीं, पाँच मिनट|nahin, paanch minute','இல்லை, அஞ்சு நிமிஷம்|illai, anju nimisham','ഇല്ല, അഞ്ച് മിനിറ്റ്|illa, anchu minute'],
+['a','Thank you very much','Muchas gracias','बहुत धन्यवाद|bahut dhanyavaad','ரொம்ப நன்றி|romba nandri','വളരെ നന്ദി|valare nandi']]}
+];
+SCENES.forEach(sc=>{sc.items=sc.lines.map(r=>{const it={who:r[0]};COLS.forEach((c,i)=>it[c]=r[i+1]);return it;});});
+
+/* ============ STATE ============ */
+const KEY='mozhi.v1';
+function def(){return{base:'en',target:null,xp:0,streak:0,last:null,day:null,dayXp:0,goal:50,done:{},srs:{},custom:{items:{},units:[]},key:'',model:'',hist:[],trTo:null,mic:true}}
+function load(){try{const j=JSON.parse(localStorage.getItem(KEY)||'null');if(j)return Object.assign(def(),j)}catch(e){}return def()}
+let S=load();
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+
+/* ============ HELPERS ============ */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const jsq=s=>esc(JSON.stringify(String(s)));
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a}
+function tx(it,l){const v=it&&it[l];if(!v)return null;const i=v.indexOf('|');return i<0?{s:v,r:''}:{s:v.slice(0,i),r:v.slice(i+1)}}
+function getItem(id){return DATA[id]||S.custom.items[id]}
+function has(it){return !!(tx(it,S.target)&&tx(it,S.base))}
+function mean(it){return tx(it,S.base).s}
+function dstr(d){return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()}
+function today(){return dstr(new Date())}
+function yesterday(){const d=new Date();d.setDate(d.getDate()-1);return dstr(d)}
+function curStreak(){return(S.last===today()||S.last===yesterday())?S.streak:0}
+function dayXp(){return S.day===today()?S.dayXp:0}
+function addXp(n){const t=today();if(S.day!==t){S.day=t;S.dayXp=0}S.dayXp+=n;S.xp+=n;if(S.last!==t){S.streak=S.last===yesterday()?S.streak+1:1;S.last=t}save();hdr()}
+let toastT;function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2600)}
+function norm(s){return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').normalize('NFC').replace(/[^\p{L}\p{M}\p{N}]/gu,'')}
+function sim(a,b){a=norm(a);b=norm(b);if(!a||!b)return 0;const m=a.length,n=b.length;let p=Array.from({length:n+1},(_,j)=>j);for(let i=1;i<=m;i++){const c=[i];for(let j=1;j<=n;j++)c[j]=Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1));p=c}return 1-p[n]/Math.max(m,n)}
+function allUnits(){return UNITS.concat(S.custom.units.filter(u=>u.base===S.base&&u.target===S.target))}
+function findUnit(id){return allUnits().find(u=>u.id===id)}
+
+/* ============ AUDIO ============ */
+let voices=[];
+function loadVoices(){try{voices=speechSynthesis.getVoices()}catch(e){}}
+if('speechSynthesis' in window){loadVoices();speechSynthesis.onvoiceschanged=loadVoices}
+function voiceFor(l){const code=LANGS[l].tts.toLowerCase();return voices.find(v=>v.lang.toLowerCase().replace('_','-')===code)||voices.find(v=>v.lang.toLowerCase().startsWith(l))}
+function say(text,l,rate){if(!('speechSynthesis' in window)){toast('Speech is not supported here');return}speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang=LANGS[l].tts;const v=voiceFor(l);if(v)u.voice=v;u.rate=rate||.9;speechSynthesis.speak(u)}
+let actx;function beep(ok){try{actx=actx||new(window.AudioContext||window.webkitAudioContext)();const o=actx.createOscillator(),g=actx.createGain();o.connect(g);g.connect(actx.destination);const t=actx.currentTime;o.frequency.setValueAtTime(ok?660:220,t);if(ok)o.frequency.setValueAtTime(880,t+.09);g.gain.setValueAtTime(.08,t);g.gain.exponentialRampToValueAtTime(.001,t+.25);o.start(t);o.stop(t+.26)}catch(e){}}
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+function listen(l){return new Promise((res,rej)=>{if(!SR)return rej(new Error('Speech recognition is not supported in this browser (use Chrome on Android).'));const r=new SR();r.lang=LANGS[l].tts;r.interimResults=false;r.maxAlternatives=5;let got=false;r.onresult=e=>{got=true;res(Array.from(e.results[0]).map(a=>a.transcript))};r.onerror=e=>{if(!got)rej(new Error(e.error==='no-speech'?'Didn’t hear anything — try again':e.error==='not-allowed'?'Microphone permission denied':e.error))};r.onend=()=>{if(!got)rej(new Error('Didn’t hear anything — try again'))};try{r.start()}catch(e){rej(e)}})}
+
+/* ============ GEMINI ============ */
+async function gemini(contents,sys,temp){
+  if(!S.key)throw new Error('Add your free Gemini API key in Settings ⚙️ first.');
+  const models=[S.model,'gemini-flash-latest','gemini-2.5-flash','gemini-2.0-flash'].filter((v,i,a)=>v&&a.indexOf(v)===i);
+  let last=new Error('No model available');
+  for(const m of models){
+    const body={contents,generationConfig:{temperature:temp==null?.4:temp,responseMimeType:'application/json'}};
+    if(sys)body.systemInstruction={parts:[{text:sys}]};
+    let res;
+    try{res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(m)+':generateContent?key='+encodeURIComponent(S.key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})}
+    catch(e){throw new Error('No internet connection — the translator and AI features need the internet.')}
+    const j=await res.json().catch(()=>({}));
+    if(res.status===404){last=new Error('Model '+m+' not found');continue}
+    if(!res.ok)throw new Error((j.error&&j.error.message)||('Gemini error '+res.status));
+    const parts=(((j.candidates||[])[0]||{}).content||{}).parts||[];
+    const t=parts.filter(p=>!p.thought).map(p=>p.text||'').join('');
+    if(!t)throw new Error('Gemini gave no answer (it may have been blocked). Try rephrasing.');
+    try{return JSON.parse(t)}catch(e){const mm=t.match(/[\[{][\s\S]*[\]}]/);if(mm)return JSON.parse(mm[0]);throw new Error('Could not read the AI reply')}
+  }
+  throw last;
+}
+
+/* ============ SHELL ============ */
+let tab='home';
+function hdr(){$('streakChip').textContent='🔥 '+curStreak();$('course').textContent=S.target?LANGS[S.base].name+' → '+LANGS[S.target].name:''}
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;sub=null;render();window.scrollTo(0,0)});
+let sub=null;
+function render(){hdr();document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===tab));const v=$('view');({home:vHome,learn:vLearn,review:vReview,talk:vTalk,translate:vTranslate})[tab](v)}
+
+/* ---------- HOME ---------- */
+function vHome(v){
+  const L=S.target,units=allUnits(),done=S.done[L]||{},nd=units.filter(u=>done[u.id]).length,next=units.find(u=>!done[u.id])||units[0],due=dueIds().length,dx=dayXp();
+  v.innerHTML=`
+  <div class="card hero">
+    <div class="mute">Learning from ${esc(LANGS[S.base].name)}</div>
+    <div style="font-size:28px;font-weight:800;margin:2px 0 10px">${esc(LANGS[L].native)} <span style="font-size:16px;opacity:.8">${esc(LANGS[L].name)}</span></div>
+    <div class="bar"><i style="width:${Math.round(nd/units.length*100)}%"></i></div>
+    <div class="mute" style="margin:6px 0 14px">${nd} of ${units.length} lessons done</div>
+    <button class="btn block" onclick="startLesson('${next.id}')">${nd?'Continue':'Start'}: ${esc(next.icon)} ${esc(next.title)}</button>
+  </div>
+  <div class="stats">
+    <div class="stat"><b>🔥 ${curStreak()}</b><span class="mute">day streak</span></div>
+    <div class="stat"><b>⭐ ${S.xp}</b><span class="mute">total XP</span></div>
+    <div class="stat"><b>${dx}/${S.goal}</b><span class="mute">today</span></div>
+  </div>
+  <div class="card"><div class="row"><div class="grow"><h3>Today’s goal</h3><div class="mute">${dx>=S.goal?'Goal reached — great work! 🎉':'Earn '+(S.goal-dx)+' more XP to keep it up'}</div></div></div><div class="bar" style="margin-top:10px"><i style="width:${Math.min(100,dx/S.goal*100)}%"></i></div></div>
+  <div class="card row"><div class="grow"><h3>🔁 Flashcard review</h3><div class="mute">${due?due+' card'+(due>1?'s':'')+' due now':'Nothing due — all caught up'}</div></div><button class="btn ${due?'acc':''}" onclick="tab='review';render()">Review</button></div>
+  <div class="card row"><div class="grow"><h3>🌐 Translate anything</h3><div class="mute">Type or speak in slang, Tanglish, Hinglish…</div></div><button class="btn" onclick="tab='translate';render()">Open</button></div>
+  <div class="card row"><div class="grow"><h3>💬 Real-life practice</h3><div class="mute">Tea shop, auto, directions — or role-play anything with AI</div></div><button class="btn" onclick="tab='talk';render()">Talk</button></div>`;
+}
+
+/* ---------- LEARN ---------- */
+let learnSeg='lessons';
+function vLearn(v){
+  const L=S.target;
+  let h=`<div class="seg">${['lessons','script','grammar'].map(s=>`<button class="${learnSeg===s?'on':''}" onclick="learnSeg='${s}';render()">${{lessons:'Lessons',script:'Script',grammar:'Grammar'}[s]}</button>`).join('')}</div>`;
+  if(learnSeg==='lessons'){
+    const done=S.done[L]||{};
+    const card=u=>`<button class="unit ${done[u.id]?'done':''}" onclick="startLesson('${u.id}')"><div class="ic">${esc(u.icon)}</div><div><h3>${esc(u.title)}</h3><div class="mute">${u.items.length} words &amp; phrases${u.grammar?' · grammar':''}</div></div><span class="tk">${done[u.id]?'✓':''}</span></button>`;
+    h+=UNITS.map(card).join('');
+    const mine=S.custom.units.filter(u=>u.base===S.base&&u.target===L);
+    h+=`<h2>✨ AI lessons</h2><div class="mute">Make a lesson on any topic — office talk, cricket, hospital, dating, anything.</div>`;
+    h+=mine.map(card).join('');
+    h+=`<div class="card"><input type="text" id="aiTopic" placeholder="Topic, e.g. talking to my house owner"><button class="btn pri block" style="margin-top:10px" id="aiBtn" onclick="makeAiLesson()">Create lesson with AI</button></div>`;
+  }else if(learnSeg==='script'){
+    if(LANGS[L].script){
+      const sc=SCRIPT[L];
+      h+=`<div class="tip">Tap a letter to hear it. Learn the vowels first, then consonants, then how vowel signs attach to a consonant.</div>`;
+      Object.keys(sc).forEach(g=>{h+=`<h2>${esc(g)}</h2><div class="grid">${letters(L,g).map(x=>`<button class="let" onclick="say(${jsq(x.c)},'${L}',.7)"><b>${esc(x.c)}</b><small>${esc(x.r)}</small></button>`).join('')}</div>`});
+      h+=`<div class="card"><h3>Practise</h3><div class="mute" style="margin-bottom:10px">Quiz yourself on letters, then read real words.</div><div class="row"><button class="btn pri grow" onclick="startScript()">Letter quiz</button><button class="btn grow" onclick="startRead()">Read words</button></div></div>`;
+    }else{
+      h+=`<div class="tip">${esc(LANGS[L].name)} uses the same A–Z letters as English. These are the sounds that trip people up:</div>`;
+      h+=`<div class="card">${LATIN_NOTES[L].map(n=>`<div class="hist row"><b style="min-width:84px;font-size:20px">${esc(n[0])}</b><span class="grow">${esc(n[1])}</span></div>`).join('')}</div>`;
+    }
+  }else{
+    h+=`<div class="card"><h3>${esc(LANGS[L].name)} grammar, in 5 ideas</h3>${TIPS[L].map((t,i)=>`<div class="hist"><b>${i+1}.</b> ${esc(t)}</div>`).join('')}</div><button class="btn pri block" onclick="startLesson('sent')">Practise building sentences 🧩</button>`;
+  }
+  v.innerHTML=h;
+}
+function letters(L,g){return SCRIPT[L][g].split(',').map(p=>{const i=p.indexOf(' ');return{c:p.slice(0,i),r:p.slice(i+1)}})}
+
+async function makeAiLesson(){
+  const topic=($('aiTopic').value||'').trim();if(!topic)return toast('Type a topic first');
+  const btn=$('aiBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span> Creating…';
+  const B=LANGS[S.base].name,T=LANGS[S.target].name;
+  try{
+    const r=await gemini([{role:'user',parts:[{text:`Create a beginner ${T} lesson on the topic "${topic}" for someone whose own language is ${B}. Give 8 genuinely useful items: a few key words and several short everyday sentences (3–6 words), exactly as native speakers really say them in daily life (natural, not textbook).
+Return JSON: {"title":"short title in English (max 4 words)","emoji":"one emoji","items":[{"base":"meaning in ${B}, in ${B} script","target":"${T} in its native script","roman":"${T} written in simple English letters, word by word (empty string if ${T} uses Latin letters)"}]}`}]}],null,.6);
+    const its=(r.items||[]).filter(x=>x&&x.base&&x.target).slice(0,10);
+    if(its.length<3)throw new Error('AI returned too few items, try again');
+    const ids=its.map((x,i)=>{const id='c'+Date.now().toString(36)+i;const it={id};it[S.base]=x.base;it[S.target]=x.roman?x.target+'|'+x.roman:x.target;S.custom.items[id]=it;return id});
+    const u={id:'u'+Date.now().toString(36),title:r.title||topic,icon:r.emoji||'✨',base:S.base,target:S.target,items:ids};
+    S.custom.units.push(u);save();toast('Lesson ready!');render();
+  }catch(e){toast(e.message);btn.disabled=false;btn.textContent='Create lesson with AI'}
+}
+
+/* ============ LESSON / QUIZ ENGINE ============ */
+let Q=null;
+const stage=()=>$('stage');
+function openStage(){stage().hidden=false;document.body.style.overflow='hidden'}
+function closeStage(){stage().hidden=true;document.body.style.overflow='';try{speechSynthesis.cancel()}catch(e){}Q=null;render()}
+function topbar(p){return`<div class="stop"><button class="iconbtn" onclick="closeStage()" aria-label="Close">✕</button><div class="bar"><i style="width:${Math.round(p*100)}%"></i></div></div>`}
+
+function startLesson(uid){
+  const u=findUnit(uid);if(!u)return;
+  const ids=u.items.filter(id=>has(getItem(id)));
+  if(!ids.length)return toast('This lesson has no content for this language pair');
+  Q={kind:'lesson',uid,ids,teach:0,unit:u};openStage();renderTeach();
+}
+function renderTeach(){
+  const it=getItem(Q.ids[Q.teach]),t=tx(it,S.target),L=S.target;
+  const tip=(Q.unit.grammar&&Q.teach===0)?`<div class="tip">💡 ${esc(TIPS[L][0])}</div>`:'';
+  stage().innerHTML=topbar(Q.teach/Q.ids.length*.3)+`<div class="sbody">
+    <div class="row"><span class="mute grow">New · ${Q.teach+1} of ${Q.ids.length}</span><button class="btn ghost" style="padding:6px 12px" onclick="startQuiz()">Skip to quiz</button></div>
+    ${tip}
+    <div class="card fcard center">
+      <div class="bigword">${esc(t.s)}</div>
+      ${t.r?`<div class="bigsub">${esc(t.r)}</div>`:''}
+      <div class="meaning">${esc(mean(it))}</div>
+      <div class="spk"><button class="round" onclick="say(${jsq(t.s)},'${L}')">🔊</button><button class="round" onclick="say(${jsq(t.s)},'${L}',.55)">🐢</button></div>
+    </div></div>
+    <div class="foot"><div class="foot-in"><button class="btn pri block" onclick="nextTeach()">${Q.teach+1<Q.ids.length?'Next':'Start quiz'}</button></div></div>`;
+  say(t.s,L);
+}
+function nextTeach(){Q.teach++;if(Q.teach>=Q.ids.length)startQuiz();else renderTeach()}
+function startQuiz(){Q.qs=buildQuiz(Q.ids);Q.i=0;Q.ok=0;Q.bad=0;Q.total=Q.qs.length;renderQ()}
+
+function poolIds(){return Object.keys(DATA).concat(Object.keys(S.custom.items)).filter(id=>has(getItem(id)))}
+function others(id,pool,n,key){
+  const ans=key(getItem(id)),out=[],seen=new Set([ans]);
+  const tryAdd=x=>{if(x===id)return;const it=getItem(x);if(!has(it))return;const k=key(it);if(!k||seen.has(k))return;seen.add(k);out.push(x)};
+  for(const x of shuffle(pool)){if(out.length>=n)break;tryAdd(x)}
+  if(out.length<n)for(const x of shuffle(poolIds())){if(out.length>=n)break;tryAdd(x)}
+  return out;
+}
+function typesFor(it){
+  const t=tx(it,S.target),n=t.s.split(/\s+/).length,a=['meaning','pick','listen'];
+  if(n>=3&&n<=9)a.push('arrange');
+  if(LANGS[S.target].script&&t.r)a.push('read');
+  if(SR&&S.mic)a.push('speak');
+  return a;
+}
+function buildQuiz(ids){
+  const qs=[];
+  shuffle(ids).forEach(id=>qs.push(makeQ(id,Math.random()<.5?'meaning':'pick',ids)));
+  const hard=shuffle(ids).slice(0,Math.min(5,ids.length));
+  hard.forEach(id=>{const ty=typesFor(getItem(id)).filter(x=>x!=='meaning'&&x!=='pick');const pick=ty.length?ty[Math.random()*ty.length|0]:'listen';qs.push(makeQ(id,pick,ids))});
+  return qs;
+}
+function makeQ(id,type,pool){
+  const it=getItem(id),L=S.target,B=S.base,t=tx(it,L),m=mean(it);
+  const answer=`${t.s}${t.r?' · '+t.r:''} = ${m}`;
+  const keyM=x=>mean(x),keyT=x=>tx(x,L).s,keyR=x=>tx(x,L).r;
+  const q={id,type,answer,say:t.s};
+  if(type==='meaning'||type==='listen'){
+    q.kind='choice';q.prompt=type==='listen'?'Listen — what does it mean?':'What does this mean?';
+    if(type==='meaning'){q.big=t.s;q.bigSub=t.r}else q.listenOnly=true;
+    q.autoSay=true;
+    q.opts=shuffle([{t:m,ok:true}].concat(others(id,pool,3,keyM).map(x=>({t:mean(getItem(x)),ok:false}))));
+  }else if(type==='pick'){
+    q.kind='choice';q.prompt='How do you say this?';q.big=m;q.bigSmall=true;q.sayAfter=true;
+    q.opts=shuffle([{t:t.s,s:t.r,ok:true}].concat(others(id,pool,3,keyT).map(x=>{const o=tx(getItem(x),L);return{t:o.s,s:o.r,ok:false}})));
+  }else if(type==='read'){
+    q.kind='choice';q.prompt='Read it — how does it sound?';q.big=t.s;q.sayAfter=true;
+    q.opts=shuffle([{t:t.r,ok:true}].concat(others(id,pool,3,x=>{const o=tx(x,L);return o.r?o.r:null}).map(x=>({t:tx(getItem(x),L).r,ok:false}))));
+  }else if(type==='arrange'){
+    q.kind='arrange';q.prompt='Put the words in order';q.big=m;q.bigSmall=true;q.sayAfter=true;
+    const st=t.s.split(/\s+/),rt=t.r?t.r.split(/\s+/):[],al=rt.length===st.length;
+    q.target=st;let toks=st.map((s,i)=>({s,r:al?rt[i]:''}));
+    const o=others(id,pool,1,keyT)[0];
+    if(o){const ot=tx(getItem(o),L),os=ot.s.split(/\s+/),orr=ot.r?ot.r.split(/\s+/):[],k=Math.random()*os.length|0;if(!st.includes(os[k]))toks.push({s:os[k],r:orr.length===os.length?orr[k]:''})}
+    q.toks=shuffle(toks);q.sel=[];
+  }else{
+    q.kind='speak';q.prompt='Say this out loud';q.big=t.s;q.bigSub=t.r;q.meaning=m;q.target={s:t.s,r:t.r};
+  }
+  return q;
+}
+function renderQ(){
+  const q=Q.qs[Q.i];if(!q)return finish();
+  Q.answered=false;const L=S.target;
+  const prog=.3+.7*(Q.i/Q.qs.length);
+  let body=`<div class="prompt">${esc(q.prompt)}</div>`;
+  if(q.listenOnly)body+=`<div class="spk"><button class="round xl" onclick="say(${jsq(q.say)},'${L}')">🔊</button><button class="round" style="align-self:center" onclick="say(${jsq(q.say)},'${L}',.55)">🐢</button></div>`;
+  else if(q.big)body+=`<div class="bigword" style="${q.bigSmall?'font-size:26px':''}">${esc(q.big)}</div>${q.bigSub?`<div class="bigsub">${esc(q.bigSub)}</div>`:''}${q.meaning?`<div class="meaning mute">${esc(q.meaning)}</div>`:''}${(q.type==='meaning'||q.kind==='speak')?`<div class="spk"><button class="round" onclick="say(${jsq(q.say)},'${L}')">🔊</button><button class="round" onclick="say(${jsq(q.say)},'${L}',.55)">🐢</button></div>`:''}`;
+  if(q.kind==='choice')body+=`<div class="opts">${q.opts.map((o,k)=>`<button class="opt" id="o${k}" onclick="choose(${k})">${esc(o.t)}${o.s?`<small>${esc(o.s)}</small>`:''}</button>`).join('')}</div>`;
+  if(q.kind==='arrange')body+=`<div class="tokens" id="ansBox"></div><div class="row" id="tokBox" style="gap:8px"></div>`;
+  if(q.kind==='speak')body+=`<div class="spk" style="margin-top:24px"><button class="round xl" id="micBtn" onclick="speakTry()">🎤</button></div><div class="center mute" id="heard">Tap the mic and say it</div>`;
+  let foot='';
+  if(q.kind==='arrange')foot=`<button class="btn pri block" id="chk" onclick="checkArrange()" disabled>Check</button>`;
+  if(q.kind==='speak')foot=`<button class="btn ghost block" onclick="skipSpeak()">Can’t speak now — skip</button>`;
+  stage().innerHTML=topbar(prog)+`<div class="sbody">${body}</div><div class="foot" id="foot">${foot?`<div class="foot-in">${foot}</div>`:''}</div>`;
+  if(q.kind==='arrange')drawTokens();
+  if(q.autoSay)setTimeout(()=>say(q.say,L),250);
+}
+function choose(k){
+  if(Q.answered)return;const q=Q.qs[Q.i];
+  q.opts.forEach((o,j)=>{if(o.ok)$('o'+j).classList.add('ok')});
+  if(!q.opts[k].ok)$('o'+k).classList.add('bad');
+  feedback(q.opts[k].ok);
+}
+function drawTokens(){
+  const q=Q.qs[Q.i];
+  $('ansBox').innerHTML=q.sel.map((ti,k)=>`<button class="tok" onclick="unpick(${k})">${esc(q.toks[ti].s)}${q.toks[ti].r?`<small>${esc(q.toks[ti].r)}</small>`:''}</button>`).join('');
+  $('tokBox').innerHTML=q.toks.map((t,i)=>`<button class="tok ${q.sel.includes(i)?'used':''}" onclick="pickTok(${i})">${esc(t.s)}${t.r?`<small>${esc(t.r)}</small>`:''}</button>`).join('');
+  const c=$('chk');if(c)c.disabled=!q.sel.length;
+}
+function pickTok(i){const q=Q.qs[Q.i];if(Q.answered||q.sel.includes(i))return;q.sel.push(i);say(q.toks[i].s,S.target,1);drawTokens()}
+function unpick(k){if(Q.answered)return;Q.qs[Q.i].sel.splice(k,1);drawTokens()}
+function checkArrange(){const q=Q.qs[Q.i];const got=q.sel.map(i=>q.toks[i].s).join(' ');feedback(norm(got)===norm(q.target.join(' ')))}
+async function speakTry(){
+  if(Q.answered)return;const q=Q.qs[Q.i],b=$('micBtn');b.innerHTML='<span class="spin"></span>';$('heard').textContent='Listening…';
+  try{const alts=await listen(S.target);let best=0,bt=alts[0]||'';alts.forEach(a=>{const s=Math.max(sim(a,q.target.s),q.target.r?sim(a,q.target.r):0);if(s>best){best=s;bt=a}});
+    $('heard').innerHTML='You said: <b>'+esc(bt)+'</b>';b.textContent='🎤';
+    if(best>=.6)feedback(true);else{toast(best>=.35?'Close! Try once more':'Not quite — listen and try again');}
+  }catch(e){b.textContent='🎤';$('heard').textContent=e.message}
+}
+function skipSpeak(){Q.qs.splice(Q.i,1);Q.total--;renderQ()}
+function feedback(ok){
+  Q.answered=true;const q=Q.qs[Q.i];beep(ok);
+  if(ok)Q.ok++;else{Q.bad++;if(!q.retry){const c=q.type==='letter'?Object.assign({},q,{opts:shuffle(q.opts)}):makeQ(q.id,q.type==='speak'?'meaning':q.type,Q.ids||[q.id]);c.retry=true;Q.qs.push(c)}}
+  if(ok&&(q.sayAfter||q.kind==='speak'))say(q.say,S.target);
+  const f=$('foot');f.className='foot '+(ok?'ok':'bad');
+  f.innerHTML=`<div class="foot-in"><div class="msg">${ok?['Correct!','Nice!','Perfect!','Great!'][Math.random()*4|0]+' +10 XP':'Not quite'}</div>${ok?`<div class="ans">${esc(q.answer)}</div>`:`<div class="ans">Answer: <b>${esc(q.answer)}</b></div>`}<button class="btn ${ok?'pri':'acc'} block" onclick="Q.i++;renderQ()">Continue</button></div>`;
+}
+function finish(){
+  const L=S.target,xp=Q.ok*10+(Q.kind==='lesson'?20:10);addXp(xp);
+  let nextBtn='';
+  if(Q.kind==='lesson'){S.done[L]=S.done[L]||{};S.done[L][Q.uid]=true;srsAdd(Q.ids);save();
+    const us=allUnits(),i=us.findIndex(u=>u.id===Q.uid),n=us.slice(i+1).find(u=>!S.done[L][u.id]);if(n)nextBtn=`<button class="btn block" style="margin-top:10px" onclick="startLesson('${n.id}')">Next: ${esc(n.icon)} ${esc(n.title)}</button>`}
+  const acc=Q.ok+Q.bad?Math.round(Q.ok/(Q.ok+Q.bad)*100):100;
+  stage().innerHTML=topbar(1)+`<div class="sbody center" style="justify-content:center"><div style="font-size:64px">🎉</div><h2 style="font-size:26px">${Q.kind==='lesson'?'Lesson complete!':'Practice done!'}</h2>
+  <div class="stats" style="margin:18px 0"><div class="stat"><b>+${xp}</b><span class="mute">XP</span></div><div class="stat"><b>${acc}%</b><span class="mute">accuracy</span></div><div class="stat"><b>🔥 ${curStreak()}</b><span class="mute">streak</span></div></div>
+  ${Q.kind==='lesson'?'<div class="mute">These words are now in your flashcards for review tomorrow.</div>':''}</div>
+  <div class="foot"><div class="foot-in"><button class="btn pri block" onclick="closeStage()">Done</button>${nextBtn}</div></div>`;
+}
+
+/* script quizzes */
+function startScript(){
+  const L=S.target,all=Object.keys(SCRIPT[L]).flatMap(g=>letters(L,g));
+  const uniq=[];const seen=new Set();all.forEach(x=>{if(!seen.has(x.c)){seen.add(x.c);uniq.push(x)}});
+  const qs=shuffle(uniq).slice(0,12).map(x=>{const rs=new Set([x.r]);const opts=[{t:x.r,ok:true}];for(const y of shuffle(uniq)){if(opts.length>=4)break;if(!rs.has(y.r)){rs.add(y.r);opts.push({t:y.r,ok:false})}}
+    return{kind:'choice',type:'letter',prompt:'How does this letter sound?',big:x.c,say:x.c,sayAfter:true,answer:x.c+' = '+x.r,opts:shuffle(opts)}});
+  Q={kind:'script',qs,i:0,ok:0,bad:0,ids:null};openStage();renderQ();
+}
+function startRead(){
+  const ids=shuffle(poolIds().filter(id=>tx(getItem(id),S.target).r)).slice(0,10);
+  Q={kind:'script',ids,i:0,ok:0,bad:0};Q.qs=ids.map(id=>makeQ(id,'read',ids));openStage();renderQ();
+}
+
+/* ============ SRS / REVIEW ============ */
+const IV=[0,1,3,7,15,30,60];
+function srsOf(l){l=l||S.target;return S.srs[l]||(S.srs[l]={})}
+function srsAdd(ids,l){const m=srsOf(l),now=Date.now();ids.forEach(id=>{if(!m[id])m[id]={b:1,due:now+864e5}});save()}
+function dueIds(){const m=srsOf(),now=Date.now();return Object.keys(m).filter(id=>m[id].due<=now&&has(getItem(id)))}
+let R=null;
+function vReview(v){
+  const due=dueIds(),m=srsOf(),total=Object.keys(m).filter(id=>has(getItem(id))).length;
+  v.innerHTML=`<h2>Flashcards</h2><div class="mute">Spaced repetition: cards you know come back less often, ones you miss come back soon.</div>
+  <div class="stats" style="margin-top:12px"><div class="stat"><b>${due.length}</b><span class="mute">due now</span></div><div class="stat"><b>${total}</b><span class="mute">in deck</span></div><div class="stat"><b>${Object.values(m).filter(x=>x.b>=4).length}</b><span class="mute">mastered</span></div></div>
+  ${due.length?`<button class="btn acc block" style="margin-top:14px" onclick="startReview(dueIds())">Review ${due.length} card${due.length>1?'s':''}</button>`:`<div class="card center"><div style="font-size:40px">✅</div><h3>All caught up</h3><div class="mute">${total?'Come back later, or practise anyway.':'Finish a lesson or save a translation to add cards.'}</div></div>`}
+  ${total?`<button class="btn block" style="margin-top:10px" onclick="startReview(shuffle(Object.keys(srsOf()).filter(id=>has(getItem(id)))).slice(0,15),true)">Practise 15 random cards</button>`:''}`;
+}
+function startReview(ids,free){ids=shuffle(ids).slice(0,25);if(!ids.length)return;R={ids,i:0,show:false,free,n:0};Q=null;openStage();renderCard()}
+function renderCard(){
+  const L=S.target;if(R.i>=R.ids.length){addXp(R.n*2);stage().innerHTML=topbar(1)+`<div class="sbody center" style="justify-content:center"><div style="font-size:60px">🧠</div><h2>Review done</h2><div class="mute">+${R.n*2} XP · ${R.n} cards</div></div><div class="foot"><div class="foot-in"><button class="btn pri block" onclick="closeStage()">Done</button></div></div>`;return}
+  const it=getItem(R.ids[R.i]),t=tx(it,L);
+  stage().innerHTML=topbar(R.i/R.ids.length)+`<div class="sbody"><div class="mute">${R.i+1} / ${R.ids.length}</div>
+  <div class="card fcard center" onclick="if(!R.show){R.show=true;renderCard()}">
+   <div class="bigword">${esc(t.s)}</div>
+   ${R.show?`${t.r?`<div class="bigsub">${esc(t.r)}</div>`:''}<div class="meaning">${esc(mean(it))}</div>`:'<div class="mute" style="margin-top:12px">Think of the meaning, then tap</div>'}
+   <div class="spk"><button class="round" onclick="event.stopPropagation();say(${jsq(t.s)},'${L}')">🔊</button></div>
+  </div></div>
+  <div class="foot"><div class="foot-in">${R.show?`<div class="row"><button class="btn ghost grow" style="color:var(--bad)" onclick="grade(0)">Again</button><button class="btn grow" onclick="grade(1)">Good</button><button class="btn pri grow" onclick="grade(2)">Easy</button></div>`:`<button class="btn pri block" onclick="R.show=true;renderCard()">Show answer</button>`}</div></div>`;
+  if(!R.show)say(t.s,L);
+}
+function grade(g){const id=R.ids[R.i],m=srsOf(),c=m[id]||{b:1,due:0},now=Date.now();
+  if(g===0){c.b=1;c.due=now+6e5;}else{c.b=Math.min(6,c.b+g);c.due=now+IV[c.b]*864e5}
+  m[id]=c;save();R.n++;R.i++;R.show=false;renderCard()}
+
+/* ============ TALK ============ */
+let scene=null,practice=false,reveal={},RP=null;
+function vTalk(v){
+  if(RP)return vRoleplay(v);
+  if(scene)return vScene(v);
+  v.innerHTML=`<h2>Real-life conversations</h2><div class="mute">Listen to each line, then practise your part out loud.</div>
+  ${SCENES.map(s=>`<button class="unit" onclick="scene='${s.id}';practice=false;reveal={};render()"><div class="ic">${s.icon}</div><div><h3>${esc(s.title)}</h3><div class="mute">${s.lines.length} lines</div></div></button>`).join('')}
+  <h2>🤖 AI role-play</h2><div class="mute">Chat with an AI shopkeeper, colleague, driver — anyone. Reply in ${esc(LANGS[S.target].name)}, ${esc(LANGS[S.base].name)} or slang; it corrects you gently.</div>
+  <div class="card"><input type="text" id="rpSit" placeholder="Situation, e.g. buying vegetables at the market"><div class="row" style="margin-top:8px;gap:6px">${['Ordering at a restaurant','Small talk with a colleague','Booking a hotel room','Meeting a new neighbour'].map(x=>`<button class="chip" onclick="$('rpSit').value=${jsq(x)}">${esc(x)}</button>`).join('')}</div><button class="btn pri block" style="margin-top:12px" onclick="startRP()">Start role-play</button></div>`;
+}
+function vScene(v){
+  const sc=SCENES.find(s=>s.id===scene),L=S.target;
+  v.innerHTML=`<div class="row" style="margin-top:8px"><button class="iconbtn" onclick="scene=null;render()">←</button><h2 class="grow" style="margin:0">${sc.icon} ${esc(sc.title)}</h2></div>
+  <div class="seg"><button class="${!practice?'on':''}" onclick="practice=false;render()">Listen</button><button class="${practice?'on':''}" onclick="practice=true;reveal={};render()">Practise my lines</button></div>
+  ${practice?'<div class="tip">Your lines are hidden. Read the meaning, say it in '+esc(LANGS[L].name)+' with 🎤, or tap to reveal.</div>':''}
+  ${sc.items.map((it,i)=>{const t=tx(it,L),me=it.who==='a',hide=practice&&me&&!reveal[i];return`<div class="bubble ${me?'me':''}"><div class="who">${me?'You':'Them'}</div>
+    <div class="${hide?'hidebox':''}" ${hide?`onclick="reveal[${i}]=1;render()"`:''}><div class="s">${esc(t.s)}</div>${t.r?`<div class="rom small">${esc(t.r)}</div>`:''}</div>
+    <div class="small mute">${esc(mean(it))}</div>
+    <div class="row" style="margin-top:6px;gap:6px"><button class="chip" onclick="say(${jsq(t.s)},'${L}')">🔊</button>${practice&&me?`<button class="chip" id="sm${i}" onclick="sceneMic(${i})">🎤 Say it</button>`:''}</div></div>`}).join('')}
+  <button class="btn pri block" onclick="playAll()">▶ Play whole conversation</button>`;
+}
+function playAll(){const sc=SCENES.find(s=>s.id===scene);let i=0;const L=S.target;speechSynthesis.cancel();const next=()=>{if(i>=sc.items.length)return;const u=new SpeechSynthesisUtterance(tx(sc.items[i],L).s);u.lang=LANGS[L].tts;const v=voiceFor(L);if(v)u.voice=v;u.rate=.9;u.onend=()=>{i++;setTimeout(next,400)};speechSynthesis.speak(u)};next()}
+async function sceneMic(i){const sc=SCENES.find(s=>s.id===scene),t=tx(sc.items[i],S.target),b=$('sm'+i);b.innerHTML='<span class="spin"></span>';
+  try{const alts=await listen(S.target);const best=Math.max(...alts.map(a=>Math.max(sim(a,t.s),t.r?sim(a,t.r):0)));
+    if(best>=.6){beep(true);reveal[i]=1;addXp(5);toast('Great! +5 XP');render()}else{beep(false);b.textContent='🎤 Try again';toast('Heard: '+alts[0])}}
+  catch(e){b.textContent='🎤 Say it';toast(e.message)}}
+
+function rpSys(){const T=LANGS[S.target].name,B=LANGS[S.base].name;return`You are role-playing a real person in this situation: "${RP.sit}". Speak ONLY natural, everyday spoken ${T} — the way locals actually talk, short (1–2 sentences), simple words suitable for a learner.
+The learner's own language is ${B}. They are practising ${T}; they may reply in ${T}, in ${B}, in slang, romanized or mixed.
+Always reply with JSON only:
+{"reply":"your next line in ${T}, native script","romanized":"your line in simple English letters (empty string if ${T} uses Latin letters)","meaning":"your line translated into ${B}","feedback":"if the learner wrote in ${T}: a short friendly correction showing the more natural way (or 'Perfect!'), written in ${B}. If they wrote in another language: show how to say their message in ${T} (native script + English letters). Empty for your first line.","suggest":"one thing the learner could say next, in ${T} with English letters in brackets"}`}
+async function startRP(){const sit=($('rpSit').value||'').trim();if(!sit)return toast('Describe a situation first');if(!S.key){openSettings();return toast('Add your Gemini key to use role-play')}
+  RP={sit,msgs:[],busy:true};render();await rpCall('Start the conversation with your first line.')}
+async function rpCall(txt){RP.busy=true;render();
+  const contents=[];contents.push({role:'user',parts:[{text:'Start the conversation with your first line.'}]});
+  RP.msgs.forEach(m=>contents.push({role:m.role,parts:[{text:m.role==='model'?JSON.stringify(m.d):m.text}]}));
+  if(RP.msgs.length)contents.push({role:'user',parts:[{text:txt}]});
+  try{const d=await gemini(contents,rpSys(),.7);if(RP.msgs.length)RP.msgs.push({role:'user',text:txt});RP.msgs.push({role:'model',d});RP.busy=false;render();say(d.reply,S.target);setTimeout(()=>window.scrollTo(0,document.body.scrollHeight),50)}
+  catch(e){RP.busy=false;toast(e.message);if(!RP.msgs.length)RP=null;render()}}
+function vRoleplay(v){const L=S.target;
+  v.innerHTML=`<div class="row" style="margin-top:8px"><button class="iconbtn" onclick="RP=null;render()">←</button><h3 class="grow" style="margin:0">🤖 ${esc(RP.sit)}</h3></div>
+  ${RP.msgs.map(m=>m.role==='user'?`<div class="bubble me"><div class="who">You</div>${esc(m.text)}</div>`:`<div class="bubble"><div class="who">Them</div><div class="s">${esc(m.d.reply)}</div>${m.d.romanized?`<div class="rom small">${esc(m.d.romanized)}</div>`:''}<div class="small mute">${esc(m.d.meaning||'')}</div><div class="row" style="margin-top:6px"><button class="chip" onclick="say(${jsq(m.d.reply)},'${L}')">🔊</button></div>${m.d.feedback?`<div class="fb">✍️ ${esc(m.d.feedback)}</div>`:''}${m.d.suggest?`<div class="small mute" style="margin-top:6px">💡 Try: ${esc(m.d.suggest)}</div>`:''}</div>`).join('')}
+  ${RP.busy?'<div class="center" style="padding:14px"><span class="spin"></span></div>':''}
+  <div class="card"><textarea id="rpIn" style="min-height:64px" placeholder="Reply in ${esc(LANGS[L].name)}, ${esc(LANGS[S.base].name)} or slang…"></textarea>
+  <div class="row" style="margin-top:8px"><button class="btn" id="rpMic" onclick="rpMic()">🎤 ${esc(LANGS[L].name)}</button><button class="btn pri grow" onclick="rpSend()" ${RP.busy?'disabled':''}>Send</button></div></div>`}
+function rpSend(){const t=($('rpIn').value||'').trim();if(!t||RP.busy)return;rpCall(t)}
+async function rpMic(){const b=$('rpMic');b.innerHTML='<span class="spin"></span>';try{const a=await listen(S.target);$('rpIn').value=a[0]}catch(e){toast(e.message)}b.textContent='🎤 '+LANGS[S.target].name}
+
+/* ============ TRANSLATE ============ */
+let TR=null;
+function langOpts(sel,withAuto){return(withAuto?`<option value="auto" ${sel==='auto'?'selected':''}>Auto-detect (slang OK)</option>`:'')+ORDER.map(l=>`<option value="${l}" ${sel===l?'selected':''}>${LANGS[l].name} · ${LANGS[l].native}</option>`).join('')}
+function vTranslate(v){
+  const to=S.trTo||S.target,from=S.trFrom||'auto',ml=S.trMic||S.base;
+  v.innerHTML=`<h2>Translate</h2><div class="mute">Talk the way you talk — slang, Tanglish, Hinglish, Manglish, half-English. It translates what you <i>mean</i>, the way a local would say it.</div>
+  ${S.key?'':`<div class="tip">🔑 The translator uses Google’s free Gemini AI. <a href="#" onclick="openSettings();return false">Add your free key in Settings</a> (takes 1 minute).</div>`}
+  <div class="card">
+   <div class="row"><select id="trFrom" class="grow" style="width:auto" onchange="S.trFrom=this.value;save()">${langOpts(from,true)}</select><span>→</span><select id="trTo" class="grow" style="width:auto" onchange="S.trTo=this.value;save()">${langOpts(to)}</select></div>
+   <textarea id="trIn" style="margin-top:10px" placeholder="e.g. Machi, semma traffic da, late aagum">${esc(TR&&TR.text||'')}</textarea>
+   <div class="row" style="margin-top:10px"><button class="btn" id="trMic" onclick="trMic()">🎤 Speak</button><select id="trMicL" style="width:auto;flex:1" onchange="S.trMic=this.value;save()">${ORDER.map(l=>`<option value="${l}" ${ml===l?'selected':''}>in ${LANGS[l].name}</option>`).join('')}</select></div>
+   <button class="btn pri block" id="trGo" style="margin-top:10px" onclick="doTranslate()">Translate</button>
+  </div>
+  <div id="trOut">${TR&&TR.res?trCard(TR.res,TR.to):''}</div>
+  ${S.hist.length?`<h2>Recent</h2>${S.hist.slice(0,15).map((h,i)=>`<div class="hist" onclick="TR={text:S.hist[${i}].text,res:S.hist[${i}].res,to:S.hist[${i}].to};render()"><div class="small mute">${esc(h.text)}</div><div><b>${esc(h.res.translation)}</b> <span class="rom small">${esc(h.res.romanized||'')}</span></div></div>`).join('')}<button class="btn ghost" style="margin-top:10px" onclick="if(confirm('Clear history?')){S.hist=[];save();render()}">Clear history</button>`:''}`;
+}
+function trCard(r,to){return`<div class="card tr-out"><div class="small mute">${esc(LANGS[to].name)}${r.detected?' · from '+esc(r.detected):''}</div>
+  <div class="big" style="margin-top:4px">${esc(r.translation)}</div>${r.romanized?`<div class="rom">${esc(r.romanized)}</div>`:''}
+  <div class="row" style="margin:10px 0;gap:6px"><button class="chip" onclick="say(${jsq(r.translation)},'${to}')">🔊 Play</button><button class="chip" onclick="say(${jsq(r.translation)},'${to}',.55)">🐢 Slow</button><button class="chip" onclick="copyTxt(${jsq(r.translation)})">📋 Copy</button><button class="chip" onclick="saveCard()">⭐ Save to flashcards</button></div>
+  ${r.meaning?`<div class="small"><b>Meaning:</b> ${esc(r.meaning)}</div>`:''}
+  ${r.polite&&r.polite!==r.translation?`<div class="small" style="margin-top:8px"><b>More polite:</b> ${esc(r.polite)} ${r.polite_romanized?`<span class="rom">(${esc(r.polite_romanized)})</span>`:''} <button class="chip" onclick="say(${jsq(r.polite)},'${to}')">🔊</button></div>`:''}
+  ${r.notes?`<div class="fb">💬 ${esc(r.notes)}</div>`:''}</div>`}
+function copyTxt(t){(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Copied'),()=>toast('Could not copy'))}
+async function trMic(){const b=$('trMic'),l=$('trMicL').value;b.innerHTML='<span class="spin"></span>';try{const a=await listen(l);const el=$('trIn');el.value=(el.value?el.value+' ':'')+a[0]}catch(e){toast(e.message)}b.textContent='🎤 Speak'}
+async function doTranslate(){
+  const text=($('trIn').value||'').trim();if(!text)return toast('Type or speak something first');
+  if(!S.key){openSettings();return toast('Add your Gemini key first')}
+  const to=$('trTo').value,from=$('trFrom').value,T=LANGS[to].name,B=LANGS[S.base].name;
+  const g=$('trGo');g.disabled=true;g.innerHTML='<span class="spin"></span> Translating…';
+  const sys=`You are an expert interpreter for Tamil, English, Hindi, Malayalam and Spanish. You deeply understand street slang, Tanglish, Hinglish, Manglish, Spanglish, regional dialects (Madras Tamil, Kongu Tamil, Bambaiya Hindi, Thrissur/Kochi Malayalam…), code-mixing, typos and romanized text.
+Understand what the speaker MEANS (including tone: casual, angry, funny, respectful), then say it the way a native ${T} speaker would naturally say it in everyday conversation — not stiff textbook language, keep the same tone.`;
+  const prompt=`Source: ${from==='auto'?'detect it (may be code-mixed or romanized)':LANGS[from].name}. Target: ${T}.
+Return JSON only:
+{"detected":"short label of the language/style you detected, e.g. Tanglish (Chennai slang)","translation":"natural ${T} in its native script","romanized":"the ${T} translation in simple English letters (empty string if ${T} uses Latin letters)","meaning":"plain meaning of the original message, written in ${B}","polite":"a more polite/formal ${T} version in native script (same as translation if already polite)","polite_romanized":"polite version in English letters (empty if Latin script)","notes":"one short line in ${B} explaining any slang or cultural nuance, or empty string"}
+Text: """${text}"""`;
+  try{const r=await gemini([{role:'user',parts:[{text:prompt}]}],sys,.3);if(!r.translation)throw new Error('No translation returned');
+    TR={text,res:r,to};S.hist.unshift({text,res:r,to});S.hist=S.hist.slice(0,30);save();render();setTimeout(()=>{const o=$('trOut');o&&o.scrollIntoView({behavior:'smooth',block:'start'})},50);say(r.translation,to)}
+  catch(e){toast(e.message);g.disabled=false;g.textContent='Translate'}
+}
+function saveCard(){if(!TR)return;const r=TR.res,to=TR.to;if(to===S.base)return toast('That’s your own language — pick another target');
+  const id='t'+Date.now().toString(36),it={id};it[to]=r.romanized?r.translation+'|'+r.romanized:r.translation;it[S.base]=r.meaning||TR.text;
+  S.custom.items[id]=it;srsAdd([id],to);
+  toast(to===S.target?'Saved — it’ll show up in Review tomorrow':'Saved to your '+LANGS[to].name+' flashcards')}
+
+/* ============ SETTINGS / ONBOARDING ============ */
+function openModal(h){$('sheet').innerHTML=h;$('modal').hidden=false}
+function closeModal(){$('modal').hidden=true;if(S.target)render()}
+let ob={base:'en',target:null};
+function onboard(){
+  const lb=(l,cur,dis,fn)=>`<button class="lb ${cur===l?'on':''}" ${dis===l?'disabled':''} onclick="${fn}('${l}')">${LANGS[l].native}<small>${LANGS[l].name}</small></button>`;
+  openModal(`<div style="font-size:30px;font-weight:800;color:var(--pri)">Mozhi</div><div class="mute">Learn to speak, read and understand — and translate anything.</div>
+  <label class="f">I speak</label><div class="langs">${ORDER.map(l=>lb(l,ob.base,null,'obB')).join('')}</div>
+  <label class="f">I want to learn</label><div class="langs">${ORDER.map(l=>lb(l,ob.target,ob.base,'obT')).join('')}</div>
+  <button class="btn pri block" style="margin-top:18px" ${ob.target?'':'disabled'} onclick="S.base=ob.base;S.target=ob.target;save();closeModal()">Start learning</button>`);
+}
+function obB(l){ob.base=l;if(ob.target===l)ob.target=null;onboard()}
+function obT(l){ob.target=l;onboard()}
+function openSettings(){
+  const vs=ORDER.map(l=>`${LANGS[l].name}: ${voices.length?(voiceFor(l)?'✅':'⚠️ no voice'):'…'}`).join(' · ');
+  openModal(`<div class="row"><h2 class="grow" style="margin:0">Settings</h2><button class="iconbtn" onclick="closeModal()">✕</button></div>
+  <label class="f">I speak (lessons explained in)</label><select id="stB">${langOpts(S.base)}</select>
+  <label class="f">I’m learning</label><select id="stT">${langOpts(S.target)}</select>
+  <div class="mute small" style="margin-top:6px">Progress is kept separately for each language.</div>
+  <label class="f">Daily goal</label><select id="stG">${[[30,'Casual · 30 XP'],[50,'Regular · 50 XP'],[100,'Serious · 100 XP'],[200,'Intense · 200 XP']].map(g=>`<option value="${g[0]}" ${S.goal==g[0]?'selected':''}>${g[1]}</option>`).join('')}</select>
+  <label class="f">Speaking exercises</label><select id="stM"><option value="1" ${S.mic?'selected':''}>On — use the microphone</option><option value="0" ${!S.mic?'selected':''}>Off</option></select>
+  <label class="f">Gemini API key (for translator, AI lessons, role-play)</label>
+  <input type="password" id="stK" value="${esc(S.key)}" placeholder="Paste key starting with AIza…" autocomplete="off">
+  <div class="mute small" style="margin-top:6px">Free: open <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> → “Create API key” → copy → paste here. It’s stored only on this phone.</div>
+  <label class="f">Model (optional)</label><input type="text" id="stMo" value="${esc(S.model)}" placeholder="gemini-flash-latest">
+  <button class="btn pri block" style="margin-top:18px" onclick="saveSettings()">Save</button>
+  <div class="mute small" style="margin-top:16px">Voices on this device — ${vs}. If a voice is missing: Android Settings → Text-to-speech → Google → Install voice data.</div>
+  <button class="btn ghost block" style="margin-top:14px;color:var(--bad)" onclick="if(confirm('Reset ALL progress, flashcards and history?')){const k=S.key;S=def();S.key=k;save();location.reload()}">Reset progress</button>`);
+}
+function saveSettings(){const b=$('stB').value,t=$('stT').value;if(b===t)return toast('Pick two different languages');
+  S.base=b;S.target=t;S.goal=+$('stG').value;S.mic=$('stM').value==='1';S.key=$('stK').value.trim();S.model=$('stMo').value.trim();save();toast('Saved');closeModal()}
+
+/* ============ BOOT ============ */
+if(S.target)render();else onboard();
+if('serviceWorker' in navigator&&location.protocol==='https:'&&!location.hostname.endsWith('claude.ai')){navigator.serviceWorker.register('sw.js').catch(()=>{})}
+</script>
+</body>
+</html>

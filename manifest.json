@@ -1,0 +1,14 @@
+{
+  "name": "Mozhi — learn & translate",
+  "short_name": "Mozhi",
+  "description": "Learn Tamil, Hindi, Malayalam, English and Spanish, and translate slang into any of them.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f2ea",
+  "theme_color": "#0f5c55",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}
